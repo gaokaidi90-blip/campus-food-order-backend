@@ -16,8 +16,13 @@ router.post('/login', authController.login)
 // 以下接口需要管理员认证
 router.use(requireAdminAuth)
 
-// 统计
+// 统计接口
 router.get('/stats/dashboard', statsController.getDashboardStats)
+router.get('/stats/trend/orders', statsController.getOrderTrend)
+router.get('/stats/trend/revenue', statsController.getRevenueTrend)
+router.get('/stats/distribution/status', statsController.getOrderStatusDistribution)
+router.get('/stats/ranking/dishes', statsController.getTopDishes)
+router.get('/stats/canteen-comparison', requireSuperAdmin, statsController.getCanteenComparison)
 
 // 食堂管理
 // 列表查询：所有管理员可访问（根据权限过滤）
