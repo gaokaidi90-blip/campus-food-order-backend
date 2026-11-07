@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { requireAdminAuth } from '../middlewares/auth.js'
+import { requireAdminAuth, requireSuperAdmin } from '../middlewares/auth.js'
 import * as authController from '../controllers/admin/auth.controller.js'
 import * as statsController from '../controllers/admin/stats.controller.js'
 import * as canteenController from '../controllers/admin/canteen.controller.js'
@@ -19,12 +19,12 @@ router.use(requireAdminAuth)
 // 统计
 router.get('/stats/dashboard', statsController.getDashboardStats)
 
-// 食堂管理
-router.get('/canteens', canteenController.getCanteens)
-router.get('/canteens/:id', canteenController.getCanteenDetail)
-router.post('/canteens', canteenController.createCanteen)
-router.put('/canteens/:id', canteenController.updateCanteen)
-router.delete('/canteens/:id', canteenController.deleteCanteen)
+// 食堂管理（仅超级管理员可访问）
+router.get('/canteens', requireSuperAdmin, canteenController.getCanteens)
+router.get('/canteens/:id', requireSuperAdmin, canteenController.getCanteenDetail)
+router.post('/canteens', requireSuperAdmin, canteenController.createCanteen)
+router.put('/canteens/:id', requireSuperAdmin, canteenController.updateCanteen)
+router.delete('/canteens/:id', requireSuperAdmin, canteenController.deleteCanteen)
 
 // 分类管理
 router.get('/categories', categoryController.getCategories)
@@ -45,9 +45,10 @@ router.get('/orders', orderController.getOrders)
 router.get('/orders/:id', orderController.getOrderDetail)
 router.put('/orders/:id/status', orderController.updateOrderStatus)
 
-// 用户管理
+// 用户管理（只读）
 router.get('/users', userController.getUsers)
 router.get('/users/:id', userController.getUserDetail)
-router.put('/users/:id', userController.updateUser)
+// 注释掉编辑功能：用户管理改为只读
+// router.put('/users/:id', userController.updateUser)
 
 export default router

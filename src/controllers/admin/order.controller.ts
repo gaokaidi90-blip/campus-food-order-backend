@@ -9,8 +9,13 @@ export async function getOrders(req: Request, res: Response) {
   try {
     const page = parseInt(req.query.page as string) || 1
     const pageSize = parseInt(req.query.pageSize as string) || 10
-    const canteenId = req.query.canteenId as string
+    let canteenId = req.query.canteenId as string
     const status = req.query.status as string
+
+    // 权限控制：食堂管理员只能查看自己食堂的订单
+    if (req.admin?.role === 'admin') {
+      canteenId = String(req.admin.canteenId!)
+    }
 
     const { list, total } = await orderModel.findAll({ canteenId, status, page, pageSize })
 
@@ -30,6 +35,11 @@ export async function getOrderDetail(req: Request, res: Response) {
 
     if (!order) {
       return res.status(404).json(error('订单不存在'))
+    }
+
+    // 权限控制：食堂管理员只能查看自己食堂的订单
+    if (req.admin?.role === 'admin' && order.canteenId !== String(req.admin.canteenId)) {
+      return res.status(403).json(error('无权访问此订单'))
     }
 
     res.json(success(order))
@@ -61,6 +71,11 @@ export async function updateOrderStatus(req: Request, res: Response) {
     const order = await orderModel.findByIdWithDetails(id)
     if (!order) {
       return res.status(404).json(error('订单不存在'))
+    }
+
+    // 权限控制：食堂管理员只能操作自己食堂的订单
+    if (req.admin?.role === 'admin' && order.canteenId !== String(req.admin.canteenId)) {
+      return res.status(403).json(error('无权操作此订单'))
     }
 
     if (!validTransitions[order.status].includes(status)) {
