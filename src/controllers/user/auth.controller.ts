@@ -7,11 +7,20 @@ import * as authService from '../../services/auth.service.js'
  */
 export async function register(req: Request, res: Response) {
   try {
-    const { studentId, name, phone, password } = req.body
+    const { studentId, name, phone, password, captcha } = req.body
 
     // 验证必填字段
     if (!studentId || !name || !phone || !password) {
       return res.status(400).json(error('请填写完整信息'))
+    }
+
+    // 验证验证码
+    if (!captcha) {
+      return res.status(400).json(error('请输入验证码'))
+    }
+
+    if (captcha !== '123456') {
+      return res.status(400).json(error('验证码错误'))
     }
 
     const result = await authService.registerUser({ studentId, name, phone, password })
