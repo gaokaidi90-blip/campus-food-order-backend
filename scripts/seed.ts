@@ -32,7 +32,7 @@ async function seed() {
 
     // 注意：需要先创建食堂，才能关联管理员
     // 临时先创建食堂
-    const canteenIds = []
+    const canteenIds: string[] = []
     const canteens = [
       { name: '第一食堂', desc: '提供各类中式餐饮', addr: '校园东区' },
       { name: '第二食堂', desc: '以西式快餐为主', addr: '校园西区' },
