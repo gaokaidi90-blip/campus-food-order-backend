@@ -35,6 +35,7 @@ pnpm dev
 | **superadmin** | super123 | 超级管理员 | 所有食堂 ⭐ |
 | **admin1** | admin123 | 食堂管理员 | 仅第一食堂 |
 | **admin2** | admin123 | 食堂管理员 | 仅第二食堂 |
+| **admin3** | admin123 | 食堂管理员 | 仅第三食堂 |
 
 ---
 

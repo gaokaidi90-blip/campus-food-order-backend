@@ -27,6 +27,7 @@ async function seed() {
     const adminId1 = uuidv4()
     const adminId2 = uuidv4()
     const adminId3 = uuidv4()
+    const adminId4 = uuidv4()
     const adminPassword = await hashPassword('admin123')
     const superPassword = await hashPassword('super123')
 
@@ -55,13 +56,15 @@ async function seed() {
       `INSERT INTO admins (id, username, password, name, phone, role, canteen_id) VALUES
        (?, 'superadmin', ?, '超级管理员', '13800000000', 'superadmin', NULL),
        (?, 'admin1', ?, '第一食堂管理员', '13800000001', 'admin', ?),
-       (?, 'admin2', ?, '第二食堂管理员', '13800000002', 'admin', ?)`,
-      [adminId1, superPassword, adminId2, adminPassword, canteenIds[0], adminId3, adminPassword, canteenIds[1]]
+       (?, 'admin2', ?, '第二食堂管理员', '13800000002', 'admin', ?),
+       (?, 'admin3', ?, '第三食堂管理员', '13800000003', 'admin', ?)`,
+      [adminId1, superPassword, adminId2, adminPassword, canteenIds[0], adminId3, adminPassword, canteenIds[1], adminId4, adminPassword, canteenIds[2]]
     )
     console.log('✓ 管理员创建成功')
     console.log('  - superadmin/super123 (超级管理员，管理所有食堂)')
     console.log('  - admin1/admin123 (第一食堂管理员)')
     console.log('  - admin2/admin123 (第二食堂管理员)')
+    console.log('  - admin3/admin123 (第三食堂管理员)')
 
     // 2. 创建测试用户（密码统一为 123456）
     const userPassword = await hashPassword('123456')
