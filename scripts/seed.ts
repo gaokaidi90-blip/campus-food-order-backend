@@ -26,31 +26,12 @@ async function seed() {
     // 1. 创建管理员（密码已加密）
     const adminId1 = uuidv4()
     const adminId2 = uuidv4()
+    const adminId3 = uuidv4()
     const adminPassword = await hashPassword('admin123')
     const superPassword = await hashPassword('super123')
 
-    await connection.query(
-      `INSERT INTO admins (id, username, password, name, phone, role) VALUES
-       (?, 'admin', ?, '普通管理员', '13800000001', 'admin'),
-       (?, 'superadmin', ?, '超级管理员', '13800000002', 'superadmin')`,
-      [adminId1, adminPassword, adminId2, superPassword]
-    )
-    console.log('✓ 管理员创建成功（admin/admin123, superadmin/super123）')
-
-    // 2. 创建测试用户（密码统一为 123456）
-    const userPassword = await hashPassword('123456')
-    const userIds = []
-    for (let i = 1; i <= 5; i++) {
-      const userId = uuidv4()
-      userIds.push(userId)
-      await connection.query(
-        `INSERT INTO users (id, student_id, name, phone, password) VALUES (?, ?, ?, ?, ?)`,
-        [userId, `202100${i}`, `测试用户${i}`, `1380000010${i}`, userPassword]
-      )
-    }
-    console.log('✓ 用户创建成功（学号 2021001-2021005，密码 123456）')
-
-    // 3. 创建食堂
+    // 注意：需要先创建食堂，才能关联管理员
+    // 临时先创建食堂
     const canteenIds = []
     const canteens = [
       { name: '第一食堂', desc: '提供各类中式餐饮', addr: '校园东区' },
@@ -68,6 +49,34 @@ async function seed() {
       )
     }
     console.log('✓ 食堂创建成功（3 个）')
+
+    // 创建管理员并关联食堂
+    await connection.query(
+      `INSERT INTO admins (id, username, password, name, phone, role, canteen_id) VALUES
+       (?, 'superadmin', ?, '超级管理员', '13800000000', 'superadmin', NULL),
+       (?, 'admin1', ?, '第一食堂管理员', '13800000001', 'admin', ?),
+       (?, 'admin2', ?, '第二食堂管理员', '13800000002', 'admin', ?)`,
+      [adminId1, superPassword, adminId2, adminPassword, canteenIds[0], adminId3, adminPassword, canteenIds[1]]
+    )
+    console.log('✓ 管理员创建成功')
+    console.log('  - superadmin/super123 (超级管理员，管理所有食堂)')
+    console.log('  - admin1/admin123 (第一食堂管理员)')
+    console.log('  - admin2/admin123 (第二食堂管理员)')
+
+    // 2. 创建测试用户（密码统一为 123456）
+    const userPassword = await hashPassword('123456')
+    const userIds = []
+    for (let i = 1; i <= 5; i++) {
+      const userId = uuidv4()
+      userIds.push(userId)
+      await connection.query(
+        `INSERT INTO users (id, student_id, name, phone, password) VALUES (?, ?, ?, ?, ?)`,
+        [userId, `202100${i}`, `测试用户${i}`, `1380000010${i}`, userPassword]
+      )
+    }
+    console.log('✓ 用户创建成功（学号 2021001-2021005，密码 123456）')
+
+    // 3. 食堂已在步骤1中创建
 
     // 4. 创建分类
     const categoryIds: string[] = []
