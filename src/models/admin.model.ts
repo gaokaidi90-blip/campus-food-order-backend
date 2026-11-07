@@ -10,6 +10,7 @@ export interface Admin {
   name: string
   phone?: string
   role: string
+  canteenId: number | null // NULL 表示超级管理员
   avatar?: string
   createdAt: string
   updatedAt: string
@@ -23,7 +24,7 @@ export interface Admin {
  */
 export async function findByUsername(username: string): Promise<Admin | null> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT id, username, name, phone, role, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE username = ?',
+    'SELECT id, username, name, phone, role, canteen_id as canteenId, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE username = ?',
     [username]
   )
   return rows.length > 0 ? (rows[0] as Admin) : null
@@ -39,7 +40,7 @@ export async function findByUsername(username: string): Promise<Admin | null> {
  */
 export async function findByUsernameWithPassword(username: string): Promise<(Admin & { password: string }) | null> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT id, username, password, name, phone, role, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE username = ?',
+    'SELECT id, username, password, name, phone, role, canteen_id as canteenId, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE username = ?',
     [username]
   )
   return rows.length > 0 ? (rows[0] as Admin & { password: string }) : null
@@ -53,7 +54,7 @@ export async function findByUsernameWithPassword(username: string): Promise<(Adm
  */
 export async function findById(adminId: string): Promise<Admin | null> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT id, username, name, phone, role, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE id = ?',
+    'SELECT id, username, name, phone, role, canteen_id as canteenId, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE id = ?',
     [adminId]
   )
   return rows.length > 0 ? (rows[0] as Admin) : null

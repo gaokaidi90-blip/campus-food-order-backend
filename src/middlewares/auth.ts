@@ -58,11 +58,18 @@ export function requireUserAuth(req: Request, res: Response, next: NextFunction)
  *
  * 权限说明：
  * - 本中间件只验证是否为管理员，不区分角色（admin/superadmin）
- * - 如需细粒度权限控制，可在 controller 中根据 req.admin.role 判断
+ * - 如需细粒度权限控制，使用 requireSuperAdmin 或在 controller 中检查
  *
  * @example
  * router.get('/admin/orders', requireAdminAuth, getOrders)
  */
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.admin || req.admin.role !== 'superadmin') {
+    return res.status(403).json(error('需要超级管理员权限', 403))
+  }
+  next()
+}
+
 export function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
   try {
     // 从 Authorization header 提取 token
@@ -85,7 +92,8 @@ export function requireAdminAuth(req: Request, res: Response, next: NextFunction
     req.admin = {
       adminId: payload.adminId,
       username: payload.username,
-      role: payload.role
+      role: payload.role,
+      canteenId: payload.canteenId  // 新增：食堂 ID
     }
 
     next()
@@ -93,4 +101,24 @@ export function requireAdminAuth(req: Request, res: Response, next: NextFunction
     // Token 无效或已过期
     return res.status(401).json(error('令牌无效或已过期', 401))
   }
+}
+
+/**
+ * 超级管理员认证中间件
+ *
+ * 验证当前管理员是否为超级管理员（role = 'superadmin'）
+ * 必须在 requireAdminAuth 之后使用
+ *
+ * 使用场景：
+ * - 食堂管理相关接口（创建、编辑、删除食堂）
+ * - 其他需要超级管理员权限的操作
+ *
+ * @example
+ * router.post('/admin/canteens', requireAdminAuth, requireSuperAdmin, createCanteen)
+ */
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.admin || req.admin.role !== 'superadmin') {
+    return res.status(403).json(error('需要超级管理员权限', 403))
+  }
+  next()
 }

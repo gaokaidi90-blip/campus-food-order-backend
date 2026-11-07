@@ -47,10 +47,12 @@ async function migrate() {
         name VARCHAR(50) NOT NULL COMMENT '姓名',
         phone VARCHAR(20) COMMENT '手机号',
         role ENUM('admin', 'superadmin') NOT NULL DEFAULT 'admin' COMMENT '角色',
+        canteen_id CHAR(36) COMMENT '关联的食堂 ID（NULL表示超级管理员）',
         avatar VARCHAR(500) COMMENT '头像 URL',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_username (username)
+        INDEX idx_username (username),
+        INDEX idx_canteen_id (canteen_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       COMMENT='管理员表'
     `)
@@ -207,6 +209,23 @@ async function migrate() {
       COMMENT='购物车表'
     `)
     console.log('✓ cart_items 表创建成功')
+
+    // 10. 为已存在的 admins 表添加 canteen_id 字段（如果表已存在但没有该字段）
+    try {
+      await connection.query(`
+        ALTER TABLE admins
+        ADD COLUMN canteen_id CHAR(36) COMMENT '关联的食堂 ID（NULL表示超级管理员）',
+        ADD INDEX idx_canteen_id (canteen_id)
+      `)
+      console.log('✓ admins 表添加 canteen_id 字段成功')
+    } catch (error: any) {
+      // 字段已存在，忽略错误
+      if (error.code === 'ER_DUP_FIELDNAME') {
+        console.log('✓ admins 表 canteen_id 字段已存在')
+      } else {
+        throw error
+      }
+    }
 
     console.log('\n✓ 数据库迁移完成！')
   } catch (error) {

@@ -115,6 +115,7 @@ export async function loginAdmin(
     adminId: admin.id,
     username: admin.username,
     role: admin.role,
+    canteenId: admin.canteenId,  // 新增：包含食堂 ID
     type: 'admin'
   })
 

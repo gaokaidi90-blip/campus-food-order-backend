@@ -30,6 +30,7 @@ declare global {
         adminId: string     // 管理员 ID
         username: string    // 用户名
         role: string        // 角色（admin/superadmin）
+        canteenId: number | null  // 关联的食堂 ID，NULL 表示超级管理员
       }
     }
   }

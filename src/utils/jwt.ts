@@ -35,12 +35,13 @@ export interface UserTokenPayload {
 /**
  * 管理员 Token 载荷
  *
- * 包含管理员身份标识、角色和类型标记
+ * 包含管理员身份标识、角色、食堂关联和类型标记
  */
 export interface AdminTokenPayload {
   adminId: string     // 管理员 ID（UUID）
   username: string    // 用户名
   role: string        // 角色（admin/superadmin）
+  canteenId: number | null  // 关联的食堂 ID，NULL 表示超级管理员
   type: 'admin'       // 类型标记
 }
 
