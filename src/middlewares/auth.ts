@@ -46,30 +46,6 @@ export function requireUserAuth(req: Request, res: Response, next: NextFunction)
   }
 }
 
-/**
- * 管理员认证中间件
- *
- * 验证管理员 JWT token，确保请求来自已登录的管理员
- * 验证通过后，将管理员信息注入到 req.admin
- *
- * 使用场景：
- * - 管理端所有接口
- * - 如：管理食堂、菜品、订单、用户等
- *
- * 权限说明：
- * - 本中间件只验证是否为管理员，不区分角色（admin/superadmin）
- * - 如需细粒度权限控制，使用 requireSuperAdmin 或在 controller 中检查
- *
- * @example
- * router.get('/admin/orders', requireAdminAuth, getOrders)
- */
-export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.admin || req.admin.role !== 'superadmin') {
-    return res.status(403).json(error('需要超级管理员权限', 403))
-  }
-  next()
-}
-
 export function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
   try {
     // 从 Authorization header 提取 token

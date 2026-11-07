@@ -99,7 +99,7 @@ async function seed() {
       categoryIds.push(categoryId)
       await connection.query(
         `INSERT INTO categories (id, canteen_id, name, sort) VALUES (?, ?, ?, ?)`,
-        [categoryId, canteenIds[cat.canteenIndex], cat.name, i]
+        [categoryId, canteenIds[cat.canteenIndex], cat.name, i + 1]
       )
     }
     console.log('✓ 分类创建成功（10 个）')

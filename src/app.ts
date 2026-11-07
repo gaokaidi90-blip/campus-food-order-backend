@@ -12,11 +12,26 @@ export function createApp() {
   const app = express()
 
   // CORS 跨域配置
-  const corsOrigin = process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:3001']
+  const defaultCorsOrigins = ['http://localhost:3000', 'http://localhost:3001']
+  const configuredCorsOrigins = process.env.CORS_ORIGIN
+    ?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean) || []
+  const corsOrigins = new Set([...defaultCorsOrigins, ...configuredCorsOrigins])
   app.use(
     cors({
-      origin: corsOrigin,
-      credentials: true
+      origin: (origin, callback) => {
+        // Allow non-browser requests without an Origin header, and explicitly
+        // validate browser origins against the normalized development list.
+        if (!origin || corsOrigins.has(origin)) {
+          callback(null, true)
+          return
+        }
+        callback(new Error(`CORS origin not allowed: ${origin}`))
+      },
+      credentials: true,
+      methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     })
   )
 

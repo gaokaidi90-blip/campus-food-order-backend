@@ -52,7 +52,7 @@ export async function findById(canteenId: string): Promise<Canteen | null> {
 /**
  * 分页查询食堂
  *
- * 支持关键词搜索
+ * 支持关键词搜索和按食堂ID过滤
  *
  * @param params - 查询参数
  * @returns 食堂列表和总数
@@ -61,6 +61,7 @@ export async function findAll(params: {
   keyword?: string
   page: number
   pageSize: number
+  canteenId?: string
 }): Promise<{ list: Canteen[]; total: number }> {
   const offset = (params.page - 1) * params.pageSize
   let whereClause = '1=1'
@@ -69,6 +70,12 @@ export async function findAll(params: {
   if (params.keyword) {
     whereClause += ' AND name LIKE ?'
     queryParams.push(`%${params.keyword}%`)
+  }
+
+  // 如果指定了 canteenId，只查询该食堂
+  if (params.canteenId) {
+    whereClause += ' AND id = ?'
+    queryParams.push(params.canteenId)
   }
 
   const [countRows] = await pool.query<RowDataPacket[]>(

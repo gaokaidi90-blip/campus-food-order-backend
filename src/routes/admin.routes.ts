@@ -19,8 +19,10 @@ router.use(requireAdminAuth)
 // 统计
 router.get('/stats/dashboard', statsController.getDashboardStats)
 
-// 食堂管理（仅超级管理员可访问）
-router.get('/canteens', requireSuperAdmin, canteenController.getCanteens)
+// 食堂管理
+// 列表查询：所有管理员可访问（根据权限过滤）
+router.get('/canteens', canteenController.getCanteens)
+// 增删改操作：仅超级管理员可访问
 router.get('/canteens/:id', requireSuperAdmin, canteenController.getCanteenDetail)
 router.post('/canteens', requireSuperAdmin, canteenController.createCanteen)
 router.put('/canteens/:id', requireSuperAdmin, canteenController.updateCanteen)

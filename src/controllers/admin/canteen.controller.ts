@@ -5,6 +5,8 @@ import * as canteenModel from '../../models/canteen.model.js'
 
 /**
  * 分页查询食堂
+ * 超级管理员：返回所有食堂
+ * 普通管理员：只返回自己管理的食堂
  */
 export async function getCanteens(req: Request, res: Response) {
   try {
@@ -12,7 +14,16 @@ export async function getCanteens(req: Request, res: Response) {
     const pageSize = parseInt(req.query.pageSize as string) || 10
     const keyword = req.query.keyword as string
 
-    const { list, total } = await canteenModel.findAll({ keyword, page, pageSize })
+    // 获取当前管理员信息
+    const admin = req.admin
+
+    // 如果是普通管理员，只查询自己管理的食堂
+    let canteenId: string | undefined
+    if (admin && admin.role !== 'superadmin' && admin.canteenId) {
+      canteenId = admin.canteenId
+    }
+
+    const { list, total } = await canteenModel.findAll({ keyword, page, pageSize, canteenId })
 
     res.json(paginate(list, total, page, pageSize))
   } catch (err: any) {
