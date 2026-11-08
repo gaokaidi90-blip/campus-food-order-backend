@@ -140,7 +140,12 @@ export async function getOrderTrend(days: number = 7, canteenId?: string): Promi
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
 
-      const found = rows.find((row: any) => row.date === dateStr)
+      const found = rows.find((row: any) => {
+        const rowDate = row.date instanceof Date
+          ? row.date.toISOString().slice(0, 10)
+          : String(row.date).slice(0, 10)
+        return rowDate === dateStr
+      })
       result.push({
         date: dateStr,
         value: found ? found.value : 0
@@ -191,7 +196,12 @@ export async function getRevenueTrend(days: number = 7, canteenId?: string): Pro
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
 
-      const found = rows.find((row: any) => row.date === dateStr)
+      const found = rows.find((row: any) => {
+        const rowDate = row.date instanceof Date
+          ? row.date.toISOString().slice(0, 10)
+          : String(row.date).slice(0, 10)
+        return rowDate === dateStr
+      })
       result.push({
         date: dateStr,
         value: found ? parseFloat(found.value) : 0
