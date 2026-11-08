@@ -6,6 +6,7 @@ import * as cartController from '../controllers/user/cart.controller.js'
 import * as orderController from '../controllers/user/order.controller.js'
 import * as addressController from '../controllers/user/address.controller.js'
 import * as profileController from '../controllers/user/profile.controller.js'
+import * as aiController from '../controllers/user/ai.controller.js'
 
 const router = Router()
 
@@ -18,6 +19,9 @@ router.get('/canteens', canteenController.getCanteens)
 router.get('/canteens/:id', canteenController.getCanteenDetail)
 router.get('/dishes', canteenController.getDishes)
 router.get('/dishes/:id', canteenController.getDishDetail)
+
+// AI 推荐（无需登录）
+router.post('/ai-recommend', aiController.recommendDishes)
 
 // 以下接口需要登录
 router.use(requireUserAuth)

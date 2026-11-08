@@ -117,6 +117,9 @@ Authorization: Bearer <token>
 - `GET /user/dishes?canteenId=&categoryId=` - 获取菜品列表
 - `GET /user/dishes/:id` - 获取菜品详情
 
+#### AI 推荐
+- `POST /user/ai-recommend` - AI 智能推荐菜品（根据自然语言需求）
+
 #### 购物车（需登录）
 - `GET /user/cart` - 获取购物车
 - `POST /user/cart` - 添加到购物车
@@ -236,6 +239,62 @@ pnpm build        # 构建生产版本
 pnpm start        # 启动生产服务器
 pnpm migrate      # 运行数据库迁移
 pnpm seed         # 填充种子数据
+```
+
+## AI 点餐助手（可选功能）
+
+用户可以通过自然语言描述需求，系统自动推荐合适的菜品。
+
+### 配置方式
+
+AI 推荐功能支持两种模式：
+
+**1. AI 增强模式（推荐）**
+
+在 `.env` 文件中配置：
+
+```env
+ANTHROPIC_API_KEY=your_api_key_here
+```
+
+获取 API Key：https://console.anthropic.com/
+
+**2. 规则模式（默认）**
+
+不配置 API Key，系统自动使用规则解析。功能可用但智能程度较低。
+
+### 示例查询
+
+- "推荐 20 元以内、不辣的菜"
+- "想吃清淡的"
+- "有什么便宜又好吃的"
+
+### API 接口
+
+```bash
+POST /api/user/ai-recommend
+Content-Type: application/json
+
+{
+  "query": "推荐20元以内不辣的菜"
+}
+```
+
+响应：
+
+```json
+{
+  "code": 200,
+  "message": "推荐成功",
+  "data": [
+    {
+      "id": "1",
+      "name": "宫保鸡丁",
+      "price": 18,
+      ...
+    }
+  ]
+}
 ```
 
 ## 安全特性
