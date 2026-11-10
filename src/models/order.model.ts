@@ -167,10 +167,12 @@ export async function findByIdWithDetails(orderId: string): Promise<OrderWithDet
 
   // 查询订单项
   const [itemRows] = await pool.query<RowDataPacket[]>(
-    `SELECT id, dish_id as dishId, dish_name as dishName, dish_image as dishImage,
-     price, quantity
-     FROM order_items
-     WHERE order_id = ?`,
+    `SELECT oi.id, oi.dish_id as dishId, oi.dish_name as dishName,
+     COALESCE(NULLIF(oi.dish_image, ''), d.image) as dishImage,
+     oi.price, oi.quantity
+     FROM order_items oi
+     LEFT JOIN dishes d ON d.id = oi.dish_id
+     WHERE oi.order_id = ?`,
     [orderId]
   )
 
@@ -316,10 +318,12 @@ export async function findAll(params: {
   const list: OrderWithDetails[] = []
   for (const orderRow of orderRows) {
     const [itemRows] = await pool.query<RowDataPacket[]>(
-      `SELECT id, dish_id as dishId, dish_name as dishName, dish_image as dishImage,
-       price, quantity
-       FROM order_items
-       WHERE order_id = ?`,
+      `SELECT oi.id, oi.dish_id as dishId, oi.dish_name as dishName,
+     COALESCE(NULLIF(oi.dish_image, ''), d.image) as dishImage,
+     oi.price, oi.quantity
+     FROM order_items oi
+     LEFT JOIN dishes d ON d.id = oi.dish_id
+     WHERE oi.order_id = ?`,
       [orderRow.id]
     )
 
