@@ -1,11 +1,13 @@
 import { v4 as uuidv4 } from 'uuid'
-import { pool } from '../config/database.js'
+import { getPool } from '../config/database'
 import * as orderModel from '../models/order.model.js'
 import * as orderItemModel from '../models/orderItem.model.js'
 import * as dishModel from '../models/dish.model.js'
 import * as addressModel from '../models/address.model.js'
 import * as canteenModel from '../models/canteen.model.js'
 import * as cartModel from '../models/cart.model.js'
+
+const pool = getPool()
 
 /**
  * 创建订单（事务）

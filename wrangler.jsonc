@@ -1,0 +1,22 @@
+{
+	"name": "campus-food-order-backend",
+    "main": "index.ts",
+	// required for database drivers to function
+	"compatibility_flags": [
+		"nodejs_compat",
+		"enable_nodejs_http_server_modules"
+	],
+	// Set this to today's date
+	"compatibility_date": "2026-11-10",
+	"hyperdrive": [
+		{
+			"binding": "HYPERDRIVE",
+			"id": "db7f6c06fb4f42068962e48dbbcb8260"
+		}
+	],
+	"alias": {
+    "aws-sdk": "./empty.js",
+    "nock": "./empty.js",
+    "mock-aws-s3": "./empty.js"
+  }
+}

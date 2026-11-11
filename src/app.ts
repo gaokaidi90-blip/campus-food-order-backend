@@ -1,15 +1,24 @@
 import express from 'express'
 import cors from 'cors'
-import userRoutes from './routes/user.routes.js'
-import adminRoutes from './routes/admin.routes.js'
-import uploadRoutes from './routes/upload.routes.js'
-import { notFoundHandler, errorHandler } from './middlewares/errorHandler.js'
+import userRoutes from './routes/user.routes'
+import adminRoutes from './routes/admin.routes'
+import uploadRoutes from './routes/upload.routes'
+import { notFoundHandler, errorHandler } from './middlewares/errorHandler'
+import { getPool } from './config/database'
 
 /**
  * 创建 Express 应用
  */
 export function createApp() {
   const app = express()
+
+  // app.use((req: any, res, next) => {
+  //   // 线上Worker已经注入req.dbPool就复用；本地环境没有，加载本地连接池
+  //   if (!req.dbPool) {
+  //     req.dbPool = getPool()
+  //   }
+  //   next()
+  // })
 
   // CORS 跨域配置
   const defaultCorsOrigins = ['http://localhost:3000', 'http://localhost:3001']
@@ -35,12 +44,12 @@ export function createApp() {
     })
   )
 
-  // 请求体解析
-  app.use(express.json())
-  app.use(express.urlencoded({ extended: true }))
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
 
   // 静态文件服务（上传的图片）
-  app.use('/uploads', express.static('uploads'))
+  // app.use('/uploads', express.static('uploads'))
 
   // 健康检查
   app.get('/health', (req, res) => {

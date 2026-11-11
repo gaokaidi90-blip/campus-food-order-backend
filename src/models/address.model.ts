@@ -1,5 +1,7 @@
-import { pool } from '../config/database.js'
+import { getPool } from '../config/database'
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
+
+const pool = getPool()
 
 /**
  * 地址实体类型
