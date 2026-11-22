@@ -78,8 +78,12 @@ export async function updateOrderStatus(req: Request, res: Response) {
       return res.status(403).json(error('无权操作此订单'))
     }
 
-    if (!validTransitions[order.status].includes(status)) {
-      return res.status(400).json(error('无效的状态转换'))
+    // 添加调试日志
+    console.log('[updateOrderStatus] 当前状态:', order.status, '目标状态:', status)
+    console.log('[updateOrderStatus] 允许的转换:', validTransitions[order.status])
+
+    if (!validTransitions[order.status] || !validTransitions[order.status].includes(status)) {
+      return res.status(400).json(error(`无效的状态转换: ${order.status} -> ${status}`))
     }
 
     await orderModel.updateStatus(id, status, cancelReason)
