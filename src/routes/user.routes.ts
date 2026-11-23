@@ -26,6 +26,10 @@ router.post('/ai-recommend', aiController.recommendDishes)
 // 以下接口需要登录
 router.use(requireUserAuth)
 
+// AI 个性化推荐和营养分析（需要登录）
+router.get('/personalized-recommend', aiController.getPersonalizedRecommend)
+router.post('/nutrition-analysis', aiController.getNutritionAnalysis)
+
 // 购物车
 router.get('/cart', cartController.getCart)
 router.post('/cart', cartController.addToCart)

@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express'
 import { success, error } from '../../utils/response.js'
-import { parseUserQuery, smartRecommend } from '../../services/ai.service.js'
+import { parseUserQuery, smartRecommend, personalizedRecommend, analyzeNutrition } from '../../services/ai.service.js'
 import { findAllActive } from '../../models/dish.model.js'
 import type { Dish } from '../../models/dish.model.js'
+import { findByUserId } from '../../models/order.model.js'
 
 /**
  * AI 推荐菜品
@@ -101,5 +102,62 @@ export async function recommendDishes(req: Request, res: Response) {
   } catch (err) {
     console.error('AI 推荐失败:', err)
     return res.status(500).json(error('推荐失败，请稍后重试', 500))
+  }
+}
+
+/**
+ * 个性化推荐
+ * GET /api/user/personalized-recommend
+ */
+export async function getPersonalizedRecommend(req: Request, res: Response) {
+  try {
+    const userId = (req as any).user?.id
+
+    if (!userId) {
+      return res.status(401).json(error('未登录', 401))
+    }
+
+    // 获取用户历史订单
+    const orders = await findByUserId(userId)
+    console.log(`User ${userId} has ${orders.length} orders`)
+
+    // 获取所有活跃菜品
+    const allDishes = await findAllActive({})
+
+    // AI 个性化推荐
+    const recommendedDishes = await personalizedRecommend(orders, allDishes, 10)
+
+    return res.json(
+      success({
+        dishes: recommendedDishes,
+        hasHistory: orders.length > 0
+      }, '推荐成功')
+    )
+  } catch (err) {
+    console.error('个性化推荐失败:', err)
+    return res.status(500).json(error('推荐失败，请稍后重试', 500))
+  }
+}
+
+/**
+ * 营养分析
+ * POST /api/user/nutrition-analysis
+ */
+export async function getNutritionAnalysis(req: Request, res: Response) {
+  try {
+    const { dishes } = req.body
+
+    // 验证输入
+    if (!Array.isArray(dishes) || dishes.length === 0) {
+      return res.status(400).json(error('请提供要分析的菜品列表', 400))
+    }
+
+    // AI 营养分析
+    const analysis = await analyzeNutrition(dishes)
+
+    return res.json(success(analysis, '分析完成'))
+  } catch (err) {
+    console.error('营养分析失败:', err)
+    return res.status(500).json(error('分析失败，请稍后重试', 500))
   }
 }

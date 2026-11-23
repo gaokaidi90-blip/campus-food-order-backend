@@ -407,3 +407,260 @@ ${dishesText}
     return candidateDishes.slice(0, limit)
   }
 }
+
+/**
+ * 个性化推荐：基于用户历史订单分析偏好
+ * @param userOrders 用户历史订单列表
+ * @param allDishes 所有可用菜品
+ * @param limit 推荐数量
+ */
+export async function personalizedRecommend(
+  userOrders: any[],
+  allDishes: any[],
+  limit: number = 10
+): Promise<any[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
+
+  // 如果没有 API Key 或订单历史为空，返回默认推荐
+  if (!apiKey || userOrders.length === 0) {
+    return allDishes.slice(0, limit)
+  }
+
+  // 提取历史订单中的菜品
+  const orderedDishes: { [key: string]: number } = {}
+  for (const order of userOrders.slice(0, 20)) {
+    // 只看最近 20 个订单
+    for (const item of order.items || []) {
+      orderedDishes[item.dishName] = (orderedDishes[item.dishName] || 0) + 1
+    }
+  }
+
+  // 构建历史订单文本
+  const historyText = Object.entries(orderedDishes)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([name, count]) => `${name}(点过${count}次)`)
+    .join('、')
+
+  // 构建候选菜品列表
+  const candidateDishes = allDishes.slice(0, 50)
+  const dishesText = candidateDishes
+    .map((dish, index) => `${index + 1}. ${dish.name} - ¥${dish.price}`)
+    .join('\n')
+
+  const requestBody = JSON.stringify({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 500,
+    messages: [
+      {
+        role: 'user',
+        content: `你是一个菜品推荐助手。根据用户的历史订单，推荐他可能喜欢的菜品。
+
+用户历史偏好：${historyText}
+
+候选菜品列表：
+${dishesText}
+
+请分析用户口味偏好（如：喜欢肉类/素菜、辣/不辣、价格区间等），然后从候选列表中挑选 ${limit} 个最适合的菜品，按推荐度排序。
+
+只返回菜品编号的 JSON 数组，格式：[1, 3, 5]，不要其他内容`
+      }
+    ]
+  })
+
+  try {
+    const recommendedIndices = await new Promise<number[]>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('AI timeout')), 5000)
+      const url = new URL(apiBaseUrl)
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(requestBody),
+          'anthropic-version': '2023-06-01',
+          'x-api-key': apiKey
+        }
+      }
+
+      const req = https.request(options, (res) => {
+        let data = ''
+        res.on('data', (chunk) => { data += chunk })
+        res.on('end', () => {
+          clearTimeout(timeout)
+          try {
+            const response = JSON.parse(data)
+            if (response.error) {
+              reject(new Error(response.error.message))
+              return
+            }
+            const content = response.content?.[0]?.text
+            if (!content) {
+              reject(new Error('No content'))
+              return
+            }
+            const jsonMatch = content.match(/\[[\d,\s]+\]/)
+            if (!jsonMatch) {
+              reject(new Error('No valid JSON'))
+              return
+            }
+            resolve(JSON.parse(jsonMatch[0]))
+          } catch (error) {
+            reject(error)
+          }
+        })
+      })
+
+      req.on('error', (error) => {
+        clearTimeout(timeout)
+        reject(error)
+      })
+
+      req.write(requestBody)
+      req.end()
+    })
+
+    const result: any[] = []
+    for (const index of recommendedIndices) {
+      if (index >= 1 && index <= candidateDishes.length) {
+        result.push(candidateDishes[index - 1])
+      }
+    }
+
+    console.log(`Personalized recommend: ${result.length} dishes based on order history`)
+    return result.length > 0 ? result : candidateDishes.slice(0, limit)
+  } catch (error) {
+    console.warn('Personalized recommend failed:', error)
+    return candidateDishes.slice(0, limit)
+  }
+}
+
+/**
+ * 营养分析：分析菜品营养成分并给出建议
+ * @param dishes 要分析的菜品列表
+ */
+export async function analyzeNutrition(dishes: any[]): Promise<{
+  summary: string
+  details: any
+  suggestions: string[]
+}> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
+
+  // 如果没有 API Key，返回默认分析
+  if (!apiKey || dishes.length === 0) {
+    return {
+      summary: '无法分析营养成分',
+      details: {},
+      suggestions: []
+    }
+  }
+
+  // 构建菜品列表文本
+  const dishesText = dishes
+    .map((dish) => `${dish.name}(¥${dish.price}) x ${dish.quantity || 1}`)
+    .join('、')
+
+  const requestBody = JSON.stringify({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 800,
+    messages: [
+      {
+        role: 'user',
+        content: `你是一个营养分析专家。请分析以下菜品的营养成分：
+
+菜品：${dishesText}
+
+请返回 JSON 格式（只返回 JSON，不要其他内容）：
+{
+  "summary": "总体营养评价（1-2句话）",
+  "details": {
+    "calories": "总热量估算（如：约800大卡）",
+    "protein": "蛋白质评估（如：中等）",
+    "carbs": "碳水化合物评估（如：偏高）",
+    "fat": "脂肪评估（如：适中）",
+    "fiber": "膳食纤维评估（如：偏低）"
+  },
+  "suggestions": [
+    "建议1：如增加蔬菜摄入",
+    "建议2：如注意控制油脂",
+    "建议3：如搭配粗粮更健康"
+  ]
+}
+
+注意：
+- 根据菜品名称和常识估算营养
+- 评估要客观实用
+- 建议要具体可行`
+      }
+    ]
+  })
+
+  try {
+    const result = await new Promise<any>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('AI timeout')), 5000)
+      const url = new URL(apiBaseUrl)
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(requestBody),
+          'anthropic-version': '2023-06-01',
+          'x-api-key': apiKey
+        }
+      }
+
+      const req = https.request(options, (res) => {
+        let data = ''
+        res.on('data', (chunk) => { data += chunk })
+        res.on('end', () => {
+          clearTimeout(timeout)
+          try {
+            const response = JSON.parse(data)
+            if (response.error) {
+              reject(new Error(response.error.message))
+              return
+            }
+            const content = response.content?.[0]?.text
+            if (!content) {
+              reject(new Error('No content'))
+              return
+            }
+            const jsonMatch = content.match(/\{[\s\S]*\}/)
+            if (!jsonMatch) {
+              reject(new Error('No valid JSON'))
+              return
+            }
+            resolve(JSON.parse(jsonMatch[0]))
+          } catch (error) {
+            reject(error)
+          }
+        })
+      })
+
+      req.on('error', (error) => {
+        clearTimeout(timeout)
+        reject(error)
+      })
+
+      req.write(requestBody)
+      req.end()
+    })
+
+    console.log('Nutrition analysis completed')
+    return result
+  } catch (error) {
+    console.warn('Nutrition analysis failed:', error)
+    return {
+      summary: '营养分析暂时不可用',
+      details: {},
+      suggestions: []
+    }
+  }
+}
