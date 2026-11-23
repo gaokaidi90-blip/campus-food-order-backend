@@ -550,8 +550,14 @@ export async function analyzeNutrition(dishes: any[]): Promise<{
   const apiKey = process.env.ANTHROPIC_API_KEY
   const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
 
+  console.log('[Nutrition Analysis] Starting...')
+  console.log('[Nutrition Analysis] API Key exists:', !!apiKey)
+  console.log('[Nutrition Analysis] API Base URL:', apiBaseUrl)
+  console.log('[Nutrition Analysis] Dishes count:', dishes.length)
+
   // 如果没有 API Key，返回默认分析
   if (!apiKey || dishes.length === 0) {
+    console.warn('[Nutrition Analysis] Missing API key or no dishes')
     return {
       summary: '无法分析营养成分',
       details: {},
@@ -600,8 +606,12 @@ export async function analyzeNutrition(dishes: any[]): Promise<{
   })
 
   try {
+    console.log('[Nutrition Analysis] Sending request...')
     const result = await new Promise<any>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('AI timeout')), 5000)
+      const timeout = setTimeout(() => {
+        console.error('[Nutrition Analysis] Request timeout after 5s')
+        reject(new Error('AI timeout'))
+      }, 5000)
       const url = new URL(apiBaseUrl)
       const options = {
         hostname: url.hostname,
@@ -616,29 +626,40 @@ export async function analyzeNutrition(dishes: any[]): Promise<{
         }
       }
 
+      console.log('[Nutrition Analysis] Request URL:', `${url.hostname}${options.path}`)
+
       const req = https.request(options, (res) => {
+        console.log('[Nutrition Analysis] Response status:', res.statusCode)
         let data = ''
         res.on('data', (chunk) => { data += chunk })
         res.on('end', () => {
           clearTimeout(timeout)
+          console.log('[Nutrition Analysis] Response length:', data.length)
           try {
             const response = JSON.parse(data)
             if (response.error) {
+              console.error('[Nutrition Analysis] API Error:', response.error.message)
               reject(new Error(response.error.message))
               return
             }
             const content = response.content?.[0]?.text
             if (!content) {
+              console.error('[Nutrition Analysis] No content in response')
               reject(new Error('No content'))
               return
             }
+            console.log('[Nutrition Analysis] Content received, length:', content.length)
             const jsonMatch = content.match(/\{[\s\S]*\}/)
             if (!jsonMatch) {
+              console.error('[Nutrition Analysis] No valid JSON in content:', content.substring(0, 200))
               reject(new Error('No valid JSON'))
               return
             }
-            resolve(JSON.parse(jsonMatch[0]))
+            const parsed = JSON.parse(jsonMatch[0])
+            console.log('[Nutrition Analysis] Successfully parsed result')
+            resolve(parsed)
           } catch (error) {
+            console.error('[Nutrition Analysis] Parse error:', error)
             reject(error)
           }
         })
@@ -646,6 +667,7 @@ export async function analyzeNutrition(dishes: any[]): Promise<{
 
       req.on('error', (error) => {
         clearTimeout(timeout)
+        console.error('[Nutrition Analysis] Request error:', error.message)
         reject(error)
       })
 
