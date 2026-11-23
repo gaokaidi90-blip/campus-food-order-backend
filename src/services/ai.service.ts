@@ -1,5 +1,145 @@
 import https from 'https'
 
+// 判断使用哪个 AI 服务
+const AI_PROVIDER = process.env.AI_PROVIDER || 'aliyun' // 'anthropic' | 'aliyun'
+
+/**
+ * 通用 AI 请求函数
+ */
+async function callAI(prompt: string, maxTokens: number = 500): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+
+  if (!apiKey) {
+    throw new Error('API Key not configured')
+  }
+
+  if (AI_PROVIDER === 'aliyun') {
+    // 阿里百炼 API（OpenAI 兼容格式）
+    return callAliyunAI(apiKey, prompt, maxTokens)
+  } else {
+    // Anthropic API
+    return callAnthropicAI(apiKey, prompt, maxTokens)
+  }
+}
+
+/**
+ * 调用阿里百炼 API
+ */
+async function callAliyunAI(apiKey: string, prompt: string, maxTokens: number): Promise<string> {
+  const requestBody = JSON.stringify({
+    model: 'qwen-plus',
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: maxTokens
+  })
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Request timeout')), 15000)
+
+    const options = {
+      hostname: 'dashscope.aliyuncs.com',
+      path: '/compatible-mode/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(requestBody)
+      }
+    }
+
+    const req = https.request(options, (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => {
+        clearTimeout(timeout)
+        try {
+          const response = JSON.parse(data)
+          if (response.error) {
+            reject(new Error(response.error.message || 'API Error'))
+            return
+          }
+          const content = response.choices?.[0]?.message?.content
+          if (!content) {
+            reject(new Error('No content in response'))
+            return
+          }
+          resolve(content)
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+
+    req.on('error', (error) => {
+      clearTimeout(timeout)
+      reject(error)
+    })
+
+    req.write(requestBody)
+    req.end()
+  })
+}
+
+/**
+ * 调用 Anthropic API
+ */
+async function callAnthropicAI(apiKey: string, prompt: string, maxTokens: number): Promise<string> {
+  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
+  const requestBody = JSON.stringify({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }]
+  })
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Request timeout')), 15000)
+    const url = new URL(apiBaseUrl)
+
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(requestBody),
+        'anthropic-version': '2023-06-01',
+        'x-api-key': apiKey
+      }
+    }
+
+    const req = https.request(options, (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => {
+        clearTimeout(timeout)
+        try {
+          const response = JSON.parse(data)
+          if (response.error) {
+            reject(new Error(response.error.message))
+            return
+          }
+          const content = response.content?.[0]?.text
+          if (!content) {
+            reject(new Error('No content in response'))
+            return
+          }
+          resolve(content)
+        } catch (error) {
+          reject(error)
+        }
+      })
+    })
+
+    req.on('error', (error) => {
+      clearTimeout(timeout)
+      reject(error)
+    })
+
+    req.write(requestBody)
+    req.end()
+  })
+}
+
 /**
  * AI 解析的筛选条件
  */
@@ -547,17 +687,10 @@ export async function analyzeNutrition(dishes: any[]): Promise<{
   details: any
   suggestions: string[]
 }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
-
   console.log('[Nutrition Analysis] Starting...')
-  console.log('[Nutrition Analysis] API Key exists:', !!apiKey)
-  console.log('[Nutrition Analysis] API Base URL:', apiBaseUrl)
   console.log('[Nutrition Analysis] Dishes count:', dishes.length)
 
-  // 如果没有 API Key，返回默认分析
-  if (!apiKey || dishes.length === 0) {
-    console.warn('[Nutrition Analysis] Missing API key or no dishes')
+  if (dishes.length === 0) {
     return {
       summary: '无法分析营养成分',
       details: {},
@@ -570,13 +703,7 @@ export async function analyzeNutrition(dishes: any[]): Promise<{
     .map((dish) => `${dish.name}(¥${dish.price}) x ${dish.quantity || 1}`)
     .join('、')
 
-  const requestBody = JSON.stringify({
-    model: 'claude-3-5-sonnet-20241022',
-    max_tokens: 800,
-    messages: [
-      {
-        role: 'user',
-        content: `你是一个营养分析专家。请分析以下菜品的营养成分：
+  const prompt = `你是一个营养分析专家。请分析以下菜品的营养成分：
 
 菜品：${dishesText}
 
@@ -601,109 +728,24 @@ export async function analyzeNutrition(dishes: any[]): Promise<{
 - 根据菜品名称和常识估算营养
 - 评估要客观实用
 - 建议要具体可行`
-      }
-    ]
-  })
 
   try {
-    console.log('[Nutrition Analysis] Sending request...')
+    console.log('[Nutrition Analysis] Calling AI...')
+    const content = await callAI(prompt, 800)
+    console.log('[Nutrition Analysis] Response length:', content.length)
 
-    // 重试机制：最多尝试 3 次
-    let lastError: any = null
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        console.log(`[Nutrition Analysis] Attempt ${attempt}/3`)
-
-        const result = await new Promise<any>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            console.error(`[Nutrition Analysis] Request timeout after 15s (attempt ${attempt})`)
-            reject(new Error('AI timeout'))
-          }, 15000) // 增加到 15 秒
-
-          const url = new URL(apiBaseUrl)
-          const options = {
-            hostname: url.hostname,
-            port: url.port || 443,
-            path: '/v1/messages',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(requestBody),
-              'anthropic-version': '2023-06-01',
-              'x-api-key': apiKey
-            }
-          }
-
-          console.log('[Nutrition Analysis] Request URL:', `${url.hostname}${options.path}`)
-
-          const req = https.request(options, (res) => {
-            console.log('[Nutrition Analysis] Response status:', res.statusCode)
-            let data = ''
-            res.on('data', (chunk) => { data += chunk })
-            res.on('end', () => {
-              clearTimeout(timeout)
-              console.log('[Nutrition Analysis] Response length:', data.length)
-              try {
-                const response = JSON.parse(data)
-                if (response.error) {
-                  console.error('[Nutrition Analysis] API Error:', response.error.message)
-                  reject(new Error(response.error.message))
-                  return
-                }
-                const content = response.content?.[0]?.text
-                if (!content) {
-                  console.error('[Nutrition Analysis] No content in response')
-                  reject(new Error('No content'))
-                  return
-                }
-                console.log('[Nutrition Analysis] Content received, length:', content.length)
-                const jsonMatch = content.match(/\{[\s\S]*\}/)
-                if (!jsonMatch) {
-                  console.error('[Nutrition Analysis] No valid JSON in content:', content.substring(0, 200))
-                  reject(new Error('No valid JSON'))
-                  return
-                }
-                const parsed = JSON.parse(jsonMatch[0])
-                console.log('[Nutrition Analysis] Successfully parsed result')
-                resolve(parsed)
-              } catch (error) {
-                console.error('[Nutrition Analysis] Parse error:', error)
-                reject(error)
-              }
-            })
-          })
-
-          req.on('error', (error) => {
-            clearTimeout(timeout)
-            console.error('[Nutrition Analysis] Request error:', error.message)
-            reject(error)
-          })
-
-          req.write(requestBody)
-          req.end()
-        })
-
-        // 如果成功，返回结果
-        console.log('[Nutrition Analysis] Request succeeded on attempt', attempt)
-        return result
-      } catch (error: any) {
-        lastError = error
-        console.error(`[Nutrition Analysis] Attempt ${attempt} failed:`, error.message)
-
-        // 如果不是最后一次尝试，等待后重试
-        if (attempt < 3) {
-          const waitTime = attempt * 1000 // 1s, 2s
-          console.log(`[Nutrition Analysis] Waiting ${waitTime}ms before retry...`)
-          await new Promise(resolve => setTimeout(resolve, waitTime))
-        }
-      }
+    // 提取 JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error('[Nutrition Analysis] No valid JSON in response')
+      throw new Error('No valid JSON')
     }
 
-    // 所有重试都失败
-    console.error('[Nutrition Analysis] All attempts failed:', lastError?.message)
-    throw lastError
+    const result = JSON.parse(jsonMatch[0])
+    console.log('[Nutrition Analysis] Success')
+    return result
   } catch (error) {
-    console.warn('Nutrition analysis failed after retries:', error)
+    console.error('[Nutrition Analysis] Failed:', error)
     return {
       summary: '营养分析暂时不可用',
       details: {},
