@@ -16,6 +16,7 @@ export interface ParsedCriteria {
  */
 export async function parseUserQuery(query: string): Promise<ParsedCriteria> {
   const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
 
   // 如果没有配置 API Key，直接使用规则解析
   if (!apiKey) {
@@ -25,7 +26,7 @@ export async function parseUserQuery(query: string): Promise<ParsedCriteria> {
 
   // 尝试使用 Claude API
   try {
-    const result = await parseWithClaude(query, apiKey)
+    const result = await parseWithClaude(query, apiKey, apiBaseUrl)
     console.log('Successfully parsed with Claude API:', result)
     return result
   } catch (error) {
@@ -37,7 +38,7 @@ export async function parseUserQuery(query: string): Promise<ParsedCriteria> {
 /**
  * 使用 Claude API 解析查询
  */
-async function parseWithClaude(query: string, apiKey: string): Promise<ParsedCriteria> {
+async function parseWithClaude(query: string, apiKey: string, apiBaseUrl: string): Promise<ParsedCriteria> {
   const requestBody = JSON.stringify({
     model: 'claude-3-5-sonnet-20241022',
     max_tokens: 300,
@@ -74,9 +75,12 @@ async function parseWithClaude(query: string, apiKey: string): Promise<ParsedCri
       reject(new Error('Claude API timeout'))
     }, 5000)
 
+    // 解析 API URL
+    const url = new URL(apiBaseUrl)
+
     const options = {
-      hostname: 'api.anthropic.com',
-      port: 443,
+      hostname: url.hostname,
+      port: url.port || 443,
       path: '/v1/messages',
       method: 'POST',
       headers: {
@@ -206,7 +210,7 @@ function parseWithRules(query: string): ParsedCriteria {
     .replace(/\d+\s*[元块钱]/g, '')
     .replace(/不?辣|微辣|中辣|麻辣|香辣/g, '')
     .replace(/清淡|重口|咸|甜|酸|鲜|嫩|爽口/g, '')
-    .replace(/推荐|想吃|要|的|什么|有|好吃|便宜|实惠|以内|左右/g, '')
+    .replace(/推荐|想吃|要|的|什么|有|好吃|便宜|实惠|以内|左右|多|几|个|些|点|来|给|我|一|下/g, '')
     .trim()
 
   // 分词
@@ -237,11 +241,17 @@ function parseWithRules(query: string): ParsedCriteria {
     '粥',
     '包子',
     '饺子',
-    '馒头',
-    '菜'
+    '馒头'
   ]
 
+  // 无意义的通用词列表
+  const stopWords = ['菜', '东西', '食物', '吃的', '小吃']
+
   for (const word of words) {
+    // 跳过停用词
+    if (stopWords.includes(word)) {
+      continue
+    }
     // 如果是常见菜品关键词，或者长度 >= 2 的词，添加到关键词列表
     if (dishKeywords.some((k) => word.includes(k)) || word.length >= 2) {
       criteria.keywords!.push(word)
