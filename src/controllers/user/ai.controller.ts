@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import { success, error } from '../../utils/response.js'
-import { parseUserQuery } from '../../services/ai.service.js'
+import { parseUserQuery, smartRecommend } from '../../services/ai.service.js'
 import { findAllActive } from '../../models/dish.model.js'
 import type { Dish } from '../../models/dish.model.js'
 
@@ -84,17 +84,18 @@ export async function recommendDishes(req: Request, res: Response) {
       console.log(`After taste filter (${criteria.taste.join(', ')}): ${filteredDishes.length} dishes`)
     }
 
-    // 5. 限制返回数量（最多 50 个）
-    const resultDishes = filteredDishes.slice(0, 50)
+    // 5. AI 智能推荐（从候选菜品中挑选最合适的）
+    const recommendedDishes = await smartRecommend(query.trim(), filteredDishes, 20)
+    console.log(`Final recommended dishes: ${recommendedDishes.length}`)
 
     // 返回推荐结果和分析条件
     return res.json(
       success(
         {
-          dishes: resultDishes,
+          dishes: recommendedDishes,
           criteria,
         },
-        resultDishes.length > 0 ? '推荐成功' : '没有找到符合条件的菜品'
+        recommendedDishes.length > 0 ? '推荐成功' : '没有找到符合条件的菜品'
       )
     )
   } catch (err) {

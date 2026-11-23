@@ -52,17 +52,28 @@ async function parseWithClaude(query: string, apiKey: string, apiBaseUrl: string
 请返回 JSON 格式（只返回 JSON，不要其他内容）：
 {
   "maxPrice": 最高价格（数字，如果没有提到则不设置）,
-  "keywords": ["菜品关键词数组"],
+  "keywords": ["菜品关键词数组，只提取具体的菜品名称，不要提取"菜"、"以上"、"以下"等无意义词"],
   "spicy": "辣度要求：no(不辣/微辣) | light(中辣) | any(可以辣/没要求)",
   "taste": ["口味标签：清淡、重口、咸、甜、酸、麻辣等"]
 }
+
+重要规则：
+1. 价格：只支持"以内"/"以下"，提取为 maxPrice。如果是"以上"，则忽略价格条件（不设置 maxPrice）
+2. 关键词：只提取具体菜品名称（如"面"、"鸡"、"豆腐"），不要提取"菜"、"以上"、"以下"、"好吃"等修饰词
+3. 如果用户只是表达数量（"多推荐几个"、"来点"），keywords 返回空数组
 
 示例：
 输入："推荐20元以内不辣的菜"
 输出：{"maxPrice":20,"keywords":[],"spicy":"no","taste":[]}
 
 输入："想吃清淡的面食"
-输出：{"maxPrice":null,"keywords":["面"],"spicy":"any","taste":["清淡"]}
+输出：{"keywords":["面"],"spicy":"any","taste":["清淡"]}
+
+输入："15元以上的菜"
+输出：{"keywords":[],"spicy":"any","taste":[]}
+
+输入："多推荐几个不辣的"
+输出：{"keywords":[],"spicy":"no","taste":[]}
 
 现在请解析用户需求。`
       }
@@ -259,4 +270,130 @@ function parseWithRules(query: string): ParsedCriteria {
   }
 
   return criteria
+}
+
+/**
+ * 使用 AI 从候选菜品中智能推荐
+ * @param query 用户原始查询
+ * @param dishes 候选菜品列表（已经过基础条件筛选）
+ * @param limit 推荐数量上限
+ */
+export async function smartRecommend(
+  query: string,
+  dishes: any[],
+  limit: number = 20
+): Promise<any[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
+
+  // 如果没有配置 API Key，或候选菜品过少，直接返回
+  if (!apiKey || dishes.length <= limit) {
+    return dishes.slice(0, limit)
+  }
+
+  // 如果候选菜品过多，限制发送给 AI 的数量（避免 token 超限）
+  const candidateDishes = dishes.slice(0, 100)
+
+  // 构建菜品列表文本
+  const dishesText = candidateDishes
+    .map((dish, index) => {
+      return `${index + 1}. ${dish.name} - ¥${dish.price}${dish.description ? ` (${dish.description})` : ''}`
+    })
+    .join('\n')
+
+  const requestBody = JSON.stringify({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 500,
+    messages: [
+      {
+        role: 'user',
+        content: `你是一个菜品推荐助手。用户说："${query}"
+
+以下是候选菜品列表：
+${dishesText}
+
+请根据用户需求，从候选列表中挑选最合适的菜品（最多 ${limit} 个），按推荐度从高到低排序。
+
+注意：
+- "女生喜欢"：推荐清淡、健康、小份的菜品
+- "便宜又好吃"：推荐性价比高、评价好的菜品
+- "适合减肥"：推荐低卡、蔬菜类、清淡的菜品
+- 只返回菜品编号的 JSON 数组，格式：[1, 3, 5]，不要其他内容`
+      }
+    ]
+  })
+
+  try {
+    const recommendedIndices = await new Promise<number[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('AI recommendation timeout'))
+      }, 5000)
+
+      const url = new URL(apiBaseUrl)
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(requestBody),
+          'anthropic-version': '2023-06-01',
+          'x-api-key': apiKey
+        }
+      }
+
+      const req = https.request(options, (res) => {
+        let data = ''
+        res.on('data', (chunk) => { data += chunk })
+        res.on('end', () => {
+          clearTimeout(timeout)
+          try {
+            const response = JSON.parse(data)
+            if (response.error) {
+              reject(new Error(`Claude API error: ${response.error.message}`))
+              return
+            }
+            const content = response.content?.[0]?.text
+            if (!content) {
+              reject(new Error('No content in Claude response'))
+              return
+            }
+            // 提取 JSON 数组
+            const jsonMatch = content.match(/\[[\d,\s]+\]/)
+            if (!jsonMatch) {
+              reject(new Error('No valid JSON array in response'))
+              return
+            }
+            const indices = JSON.parse(jsonMatch[0])
+            resolve(indices)
+          } catch (error) {
+            reject(error)
+          }
+        })
+      })
+
+      req.on('error', (error) => {
+        clearTimeout(timeout)
+        reject(error)
+      })
+
+      req.write(requestBody)
+      req.end()
+    })
+
+    // 根据 AI 推荐的编号返回菜品
+    const result: any[] = []
+    for (const index of recommendedIndices) {
+      if (index >= 1 && index <= candidateDishes.length) {
+        result.push(candidateDishes[index - 1])
+      }
+    }
+
+    console.log(`AI smart recommend: ${result.length} dishes from ${candidateDishes.length} candidates`)
+    return result.length > 0 ? result : candidateDishes.slice(0, limit)
+  } catch (error) {
+    console.warn('AI smart recommend failed, using original order:', error)
+    return candidateDishes.slice(0, limit)
+  }
 }
