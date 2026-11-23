@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 管理员实体类型
@@ -25,7 +24,7 @@ export interface Admin {
  * @returns 管理员信息（不含密码）
  */
 export async function findByUsername(username: string): Promise<Admin | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     'SELECT id, username, name, phone, role, canteen_id as canteenId, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE username = ?',
     [username]
   )
@@ -41,7 +40,7 @@ export async function findByUsername(username: string): Promise<Admin | null> {
  * @returns 管理员信息（含密码）
  */
 export async function findByUsernameWithPassword(username: string): Promise<(Admin & { password: string }) | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     'SELECT id, username, password, name, phone, role, canteen_id as canteenId, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE username = ?',
     [username]
   )
@@ -55,9 +54,10 @@ export async function findByUsernameWithPassword(username: string): Promise<(Adm
  * @returns 管理员信息（不含密码）
  */
 export async function findById(adminId: string): Promise<Admin | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     'SELECT id, username, name, phone, role, canteen_id as canteenId, avatar, created_at as createdAt, updated_at as updatedAt FROM admins WHERE id = ?',
     [adminId]
   )
   return rows.length > 0 ? (rows[0] as Admin) : null
 }
+

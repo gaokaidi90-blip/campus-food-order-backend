@@ -1,10 +1,11 @@
-import { pool } from '../src/config/database.js'
+import { getPool } from '../src/config/database.js'
 import { hashPassword } from '../src/utils/bcrypt.js'
 import { v4 as uuidv4 } from 'uuid'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
+const pool = getPool()
 /**
  * 数据库种子脚本
  *
@@ -21,6 +22,7 @@ async function seed() {
   const connection = await pool.getConnection()
 
   try {
+    await connection.beginTransaction()
     console.log('开始填充数据...')
 
     // 1. 创建管理员（密码已加密）
@@ -178,13 +180,15 @@ async function seed() {
     }
     console.log('✓ 地址创建成功（每用户 1 个默认地址）')
 
+    await connection.commit()
     console.log('\n✓ 数据填充完成！')
     console.log('\n测试账号：')
     console.log('管理员: admin / admin123')
     console.log('超级管理员: superadmin / super123')
     console.log('用户: 2021001-2021005 / 123456')
   } catch (error) {
-    console.error('✗ 数据填充失败:', error)
+    await connection.rollback()
+    console.error('✗ 数据填充失败，事务已回滚:', error)
     throw error
   } finally {
     connection.release()

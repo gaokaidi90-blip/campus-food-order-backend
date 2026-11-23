@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 订单实体类型
@@ -66,7 +65,7 @@ export async function findByUserId(userId: string, status?: string): Promise<Ord
     params.push(status)
   }
 
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, order_no as orderNo, user_id as userId, canteen_id as canteenId,
      address_id as addressId, status, total_amount as totalAmount, remark, cancel_reason as cancelReason,
      created_at as createdAt, updated_at as updatedAt
@@ -94,7 +93,7 @@ export async function findByIdAndUser(
   userId: string,
   connection?: PoolConnection
 ): Promise<Order | null> {
-  const conn = connection || pool
+  const conn = connection || getPool()
   const [rows] = await conn.query<RowDataPacket[]>(
     `SELECT id, order_no as orderNo, user_id as userId, canteen_id as canteenId,
      address_id as addressId, status, total_amount as totalAmount, remark, cancel_reason as cancelReason,
@@ -145,7 +144,7 @@ export async function findByIdAndUserForUpdate(
  */
 export async function findByIdWithDetails(orderId: string): Promise<OrderWithDetails | null> {
   // 查询订单基本信息及关联的用户、食堂、地址
-  const [orderRows] = await pool.query<RowDataPacket[]>(
+  const [orderRows] = await getPool().query<RowDataPacket[]>(
     `SELECT
       o.id, o.order_no as orderNo, o.user_id as userId, o.canteen_id as canteenId,
       o.address_id as addressId, o.status, o.total_amount as totalAmount,
@@ -168,7 +167,7 @@ export async function findByIdWithDetails(orderId: string): Promise<OrderWithDet
   const orderRow = orderRows[0]
 
   // 查询订单项
-  const [itemRows] = await pool.query<RowDataPacket[]>(
+  const [itemRows] = await getPool().query<RowDataPacket[]>(
     `SELECT oi.id, oi.dish_id as dishId, oi.dish_name as dishName,
      COALESCE(NULLIF(oi.dish_image, ''), d.image) as dishImage,
      oi.price, oi.quantity
@@ -250,7 +249,7 @@ export async function updateStatus(
   cancelReason?: string,
   connection?: PoolConnection
 ): Promise<void> {
-  const conn = connection || pool
+  const conn = connection || getPool()
 
   if (cancelReason) {
     await conn.query(
@@ -289,14 +288,14 @@ export async function findAll(params: {
   }
 
   // 查询总数
-  const [countRows] = await pool.query<RowDataPacket[]>(
+  const [countRows] = await getPool().query<RowDataPacket[]>(
     `SELECT COUNT(*) as total FROM orders o WHERE ${whereClause}`,
     queryParams
   )
   const total = countRows[0].total
 
   // 查询订单列表（含基本关联信息）
-  const [orderRows] = await pool.query<RowDataPacket[]>(
+  const [orderRows] = await getPool().query<RowDataPacket[]>(
     `SELECT
       o.id, o.order_no as orderNo, o.user_id as userId, o.canteen_id as canteenId,
       o.address_id as addressId, o.status, o.total_amount as totalAmount,
@@ -319,7 +318,7 @@ export async function findAll(params: {
   // 为每个订单查询订单项
   const list: OrderWithDetails[] = []
   for (const orderRow of orderRows) {
-    const [itemRows] = await pool.query<RowDataPacket[]>(
+    const [itemRows] = await getPool().query<RowDataPacket[]>(
       `SELECT oi.id, oi.dish_id as dishId, oi.dish_name as dishName,
      COALESCE(NULLIF(oi.dish_image, ''), d.image) as dishImage,
      oi.price, oi.quantity
@@ -370,3 +369,4 @@ export async function findAll(params: {
 
   return { list, total }
 }
+

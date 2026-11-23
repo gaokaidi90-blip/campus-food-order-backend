@@ -30,7 +30,12 @@ export async function updateProfile(req: Request, res: Response) {
 
     await userModel.update(userId, { name, avatar })
 
-    res.json(success(null, '更新成功'))
+    const user = await userModel.findById(userId)
+    if (!user) {
+      return res.status(404).json(error('用户不存在'))
+    }
+
+    res.json(success(user, '更新成功'))
   } catch (err: any) {
     res.status(400).json(error(err.message))
   }

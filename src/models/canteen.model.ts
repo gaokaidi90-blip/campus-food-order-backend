@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 /**
  * 食堂实体类型
  */
@@ -26,7 +25,7 @@ export interface Canteen {
  * @returns 食堂列表（仅status=1）
  */
 export async function findAllActive(): Promise<Canteen[]> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, name, description, image, address, open_time as openTime, close_time as closeTime,
      status, created_at as createdAt, updated_at as updatedAt
      FROM canteens WHERE status = 1 ORDER BY created_at DESC`
@@ -41,7 +40,7 @@ export async function findAllActive(): Promise<Canteen[]> {
  * @returns 食堂信息
  */
 export async function findById(canteenId: string): Promise<Canteen | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, name, description, image, address, open_time as openTime, close_time as closeTime,
      status, created_at as createdAt, updated_at as updatedAt
      FROM canteens WHERE id = ?`,
@@ -79,13 +78,13 @@ export async function findAll(params: {
     queryParams.push(params.canteenId)
   }
 
-  const [countRows] = await pool.query<RowDataPacket[]>(
+  const [countRows] = await getPool().query<RowDataPacket[]>(
     `SELECT COUNT(*) as total FROM canteens WHERE ${whereClause}`,
     queryParams
   )
   const total = countRows[0].total
 
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, name, description, image, address, open_time as openTime, close_time as closeTime,
      status, created_at as createdAt, updated_at as updatedAt
      FROM canteens WHERE ${whereClause}
@@ -104,7 +103,7 @@ export async function findAll(params: {
  * @returns 新食堂 ID
  */
 export async function create(data: Omit<Canteen, 'createdAt' | 'updatedAt'>): Promise<string> {
-  await pool.query(
+  await getPool().query(
     `INSERT INTO canteens (id, name, description, image, address, open_time, close_time, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [data.id, data.name, data.description, data.image, data.address, data.openTime, data.closeTime, data.status]
@@ -142,7 +141,7 @@ export async function update(canteenId: string, data: Partial<Omit<Canteen, 'id'
   if (fields.length === 0) return
 
   values.push(canteenId)
-  await pool.query(`UPDATE canteens SET ${fields.join(', ')} WHERE id = ?`, values)
+  await getPool().query(`UPDATE canteens SET ${fields.join(', ')} WHERE id = ?`, values)
 }
 
 /**
@@ -153,5 +152,6 @@ export async function update(canteenId: string, data: Partial<Omit<Canteen, 'id'
  * @param canteenId - 食堂 ID
  */
 export async function remove(canteenId: string): Promise<void> {
-  await pool.query('DELETE FROM canteens WHERE id = ?', [canteenId])
+  await getPool().query('DELETE FROM canteens WHERE id = ?', [canteenId])
 }
+

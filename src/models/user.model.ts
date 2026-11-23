@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 用户实体类型
@@ -22,7 +21,7 @@ export interface User {
  * @returns 用户信息（不含密码）
  */
 export async function findByStudentId(studentId: string): Promise<User | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     'SELECT id, student_id as studentId, name, phone, avatar, created_at as createdAt FROM users WHERE student_id = ?',
     [studentId]
   )
@@ -38,7 +37,7 @@ export async function findByStudentId(studentId: string): Promise<User | null> {
  * @returns 用户信息（含密码）
  */
 export async function findByStudentIdWithPassword(studentId: string): Promise<(User & { password: string }) | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     'SELECT id, student_id as studentId, name, phone, avatar, password, created_at as createdAt FROM users WHERE student_id = ?',
     [studentId]
   )
@@ -52,7 +51,7 @@ export async function findByStudentIdWithPassword(studentId: string): Promise<(U
  * @returns 用户信息（不含密码）
  */
 export async function findById(userId: string): Promise<User | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     'SELECT id, student_id as studentId, name, phone, avatar, created_at as createdAt FROM users WHERE id = ?',
     [userId]
   )
@@ -74,7 +73,7 @@ export async function create(data: {
   phone: string
   password: string
 }): Promise<string> {
-  await pool.query(
+  await getPool().query(
     'INSERT INTO users (id, student_id, name, phone, password) VALUES (?, ?, ?, ?, ?)',
     [data.id, data.studentId, data.name, data.phone, data.password]
   )
@@ -106,7 +105,7 @@ export async function update(userId: string, data: { name?: string; avatar?: str
   if (fields.length === 0) return
 
   values.push(userId)
-  await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
+  await getPool().query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
 }
 
 /**
@@ -133,14 +132,14 @@ export async function findAll(params: {
   }
 
   // 查询总数
-  const [countRows] = await pool.query<RowDataPacket[]>(
+  const [countRows] = await getPool().query<RowDataPacket[]>(
     `SELECT COUNT(*) as total FROM users WHERE ${whereClause}`,
     queryParams
   )
   const total = countRows[0].total
 
   // 查询列表
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, student_id as studentId, name, phone, avatar, created_at as createdAt
      FROM users
      WHERE ${whereClause}
@@ -151,3 +150,4 @@ export async function findAll(params: {
 
   return { users: rows as User[], total }
 }
+

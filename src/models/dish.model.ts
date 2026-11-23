@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 菜品实体类型
@@ -46,7 +45,7 @@ export async function findAllActive(params: {
     queryParams.push(params.categoryId)
   }
 
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, canteen_id as canteenId, category_id as categoryId, name, description, image,
      price, original_price as originalPrice, stock, sales, status, specifications,
      created_at as createdAt, updated_at as updatedAt
@@ -65,7 +64,7 @@ export async function findAllActive(params: {
  * @returns 菜品信息
  */
 export async function findById(dishId: string): Promise<Dish | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, canteen_id as canteenId, category_id as categoryId, name, description, image,
      price, original_price as originalPrice, stock, sales, status, specifications,
      created_at as createdAt, updated_at as updatedAt
@@ -149,13 +148,13 @@ export async function findAll(params: {
     queryParams.push(`%${params.keyword}%`)
   }
 
-  const [countRows] = await pool.query<RowDataPacket[]>(
+  const [countRows] = await getPool().query<RowDataPacket[]>(
     `SELECT COUNT(*) as total FROM dishes WHERE ${whereClause}`,
     queryParams
   )
   const total = countRows[0].total
 
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, canteen_id as canteenId, category_id as categoryId, name, description, image,
      price, original_price as originalPrice, stock, sales, status, specifications,
      created_at as createdAt, updated_at as updatedAt
@@ -175,7 +174,7 @@ export async function findAll(params: {
  * @returns 新菜品 ID
  */
 export async function create(data: Omit<Dish, 'sales' | 'createdAt' | 'updatedAt'>): Promise<string> {
-  await pool.query(
+  await getPool().query(
     `INSERT INTO dishes (id, canteen_id, category_id, name, description, image, price, original_price, stock, status, specifications)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -230,7 +229,7 @@ export async function update(
   if (fields.length === 0) return
 
   values.push(dishId)
-  await pool.query(`UPDATE dishes SET ${fields.join(', ')} WHERE id = ?`, values)
+  await getPool().query(`UPDATE dishes SET ${fields.join(', ')} WHERE id = ?`, values)
 }
 
 /**
@@ -239,5 +238,6 @@ export async function update(
  * @param dishId - 菜品 ID
  */
 export async function remove(dishId: string): Promise<void> {
-  await pool.query('DELETE FROM dishes WHERE id = ?', [dishId])
+  await getPool().query('DELETE FROM dishes WHERE id = ?', [dishId])
 }
+

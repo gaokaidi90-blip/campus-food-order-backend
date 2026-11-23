@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 仪表盘统计数据
@@ -71,7 +70,7 @@ export async function getDashboardStats(canteenId?: string): Promise<DashboardSt
     }
 
     // 查询总订单数和总营收
-    const [totalRows] = await pool.query<RowDataPacket[]>(
+    const [totalRows] = await getPool().query<RowDataPacket[]>(
       `SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue
        FROM orders
        WHERE ${whereClause}`,
@@ -79,7 +78,7 @@ export async function getDashboardStats(canteenId?: string): Promise<DashboardSt
     )
 
     // 查询今日订单数和今日营收
-    const [todayRows] = await pool.query<RowDataPacket[]>(
+    const [todayRows] = await getPool().query<RowDataPacket[]>(
       `SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue
        FROM orders
        WHERE ${whereClause}
@@ -95,13 +94,7 @@ export async function getDashboardStats(canteenId?: string): Promise<DashboardSt
     }
   } catch (error) {
     console.error('获取仪表盘统计失败:', error)
-    // 返回空数据而不是抛出异常
-    return {
-      totalOrders: 0,
-      totalRevenue: 0,
-      todayOrders: 0,
-      todayRevenue: 0
-    }
+    throw error
   }
 }
 
@@ -124,7 +117,7 @@ export async function getOrderTrend(days: number = 7, canteenId?: string): Promi
       params.push(canteenId)
     }
 
-    const [rows] = await pool.query<RowDataPacket[]>(
+    const [rows] = await getPool().query<RowDataPacket[]>(
       `SELECT DATE(created_at) as date, COUNT(*) as value
        FROM orders
        WHERE ${whereClause}
@@ -157,7 +150,7 @@ export async function getOrderTrend(days: number = 7, canteenId?: string): Promi
     return result
   } catch (error) {
     console.error('获取订单趋势失败:', error)
-    return []
+    throw error
   }
 }
 
@@ -180,7 +173,7 @@ export async function getRevenueTrend(days: number = 7, canteenId?: string): Pro
       params.push(canteenId)
     }
 
-    const [rows] = await pool.query<RowDataPacket[]>(
+    const [rows] = await getPool().query<RowDataPacket[]>(
       `SELECT DATE(created_at) as date, COALESCE(SUM(total_amount), 0) as value
        FROM orders
        WHERE ${whereClause}
@@ -213,7 +206,7 @@ export async function getRevenueTrend(days: number = 7, canteenId?: string): Pro
     return result
   } catch (error) {
     console.error('获取营业额趋势失败:', error)
-    return []
+    throw error
   }
 }
 
@@ -235,7 +228,7 @@ export async function getOrderStatusDistribution(canteenId?: string): Promise<St
       params.push(canteenId)
     }
 
-    const [rows] = await pool.query<RowDataPacket[]>(
+    const [rows] = await getPool().query<RowDataPacket[]>(
       `SELECT status, COUNT(*) as count
        FROM orders
        WHERE ${whereClause}
@@ -250,7 +243,7 @@ export async function getOrderStatusDistribution(canteenId?: string): Promise<St
     }))
   } catch (error) {
     console.error('获取订单状态分布失败:', error)
-    return []
+    throw error
   }
 }
 
@@ -273,7 +266,7 @@ export async function getTopDishes(limit: number = 10, canteenId?: string): Prom
       params.push(canteenId)
     }
 
-    const [rows] = await pool.query<RowDataPacket[]>(
+    const [rows] = await getPool().query<RowDataPacket[]>(
       `SELECT
          oi.dish_id as dishId,
          d.name as dishName,
@@ -297,7 +290,7 @@ export async function getTopDishes(limit: number = 10, canteenId?: string): Prom
     }))
   } catch (error) {
     console.error('获取热销菜品排行失败:', error)
-    return []
+    throw error
   }
 }
 
@@ -310,7 +303,7 @@ export async function getTopDishes(limit: number = 10, canteenId?: string): Prom
  */
 export async function getCanteenComparison(): Promise<CanteenStats[]> {
   try {
-    const [rows] = await pool.query<RowDataPacket[]>(
+    const [rows] = await getPool().query<RowDataPacket[]>(
       `SELECT
          c.id as canteenId,
          c.name as canteenName,
@@ -330,6 +323,7 @@ export async function getCanteenComparison(): Promise<CanteenStats[]> {
     }))
   } catch (error) {
     console.error('获取食堂对比数据失败:', error)
-    return []
+    throw error
   }
 }
+

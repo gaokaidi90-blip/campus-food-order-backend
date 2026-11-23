@@ -82,8 +82,15 @@ export async function recommendDishes(req: Request, res: Response) {
     // 5. 限制返回数量（最多 20 个）
     const resultDishes = filteredDishes.slice(0, 20)
 
+    // 返回推荐结果和分析条件
     return res.json(
-      success(resultDishes, resultDishes.length > 0 ? '推荐成功' : '没有找到符合条件的菜品')
+      success(
+        {
+          dishes: resultDishes,
+          criteria,
+        },
+        resultDishes.length > 0 ? '推荐成功' : '没有找到符合条件的菜品'
+      )
     )
   } catch (err) {
     console.error('AI 推荐失败:', err)

@@ -21,7 +21,12 @@ export function createApp() {
   // })
 
   // CORS 跨域配置
-  const defaultCorsOrigins = ['http://localhost:3000', 'http://localhost:3001']
+  const defaultCorsOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://campus-food-order.pages.dev',
+    'https://campus-food-order-admin.pages.dev',
+  ]
   const configuredCorsOrigins = process.env.CORS_ORIGIN
     ?.split(',')
     .map((origin) => origin.trim())
@@ -69,3 +74,4 @@ export function createApp() {
 
   return app
 }
+

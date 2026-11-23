@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 地址实体类型
@@ -26,7 +25,7 @@ export interface Address {
  * @returns 地址列表（默认地址排在前面）
  */
 export async function findByUserId(userId: string): Promise<Address[]> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, user_id as userId, name, phone, address, building, room, is_default as isDefault,
      created_at as createdAt, updated_at as updatedAt
      FROM addresses WHERE user_id = ?
@@ -47,7 +46,7 @@ export async function findByUserId(userId: string): Promise<Address[]> {
  * @returns 地址信息
  */
 export async function findByIdAndUser(addressId: string, userId: string, connection?: PoolConnection): Promise<Address | null> {
-  const conn = connection || pool
+  const conn = connection || getPool()
   const [rows] = await conn.query<RowDataPacket[]>(
     `SELECT id, user_id as userId, name, phone, address, building, room, is_default as isDefault,
      created_at as createdAt, updated_at as updatedAt
@@ -66,7 +65,7 @@ export async function findByIdAndUser(addressId: string, userId: string, connect
  * @returns 新地址 ID
  */
 export async function create(data: Omit<Address, 'createdAt' | 'updatedAt'>): Promise<string> {
-  const connection = await pool.getConnection()
+  const connection = await getPool().getConnection()
 
   try {
     await connection.beginTransaction()
@@ -106,7 +105,7 @@ export async function update(
   userId: string,
   data: Partial<Omit<Address, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
 ): Promise<void> {
-  const connection = await pool.getConnection()
+  const connection = await getPool().getConnection()
 
   try {
     await connection.beginTransaction()
@@ -156,5 +155,6 @@ export async function update(
  * @param userId - 用户 ID（用于验证归属权）
  */
 export async function remove(addressId: string, userId: string): Promise<void> {
-  await pool.query('DELETE FROM addresses WHERE id = ? AND user_id = ?', [addressId, userId])
+  await getPool().query('DELETE FROM addresses WHERE id = ? AND user_id = ?', [addressId, userId])
 }
+

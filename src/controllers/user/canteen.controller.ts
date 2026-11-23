@@ -12,6 +12,13 @@ export async function getCanteens(req: Request, res: Response) {
     const canteens = await canteenModel.findAllActive()
     res.json(success(canteens))
   } catch (err: any) {
+    console.error('getCanteens 数据库查询失败', {
+      name: err?.name,
+      message: err?.message,
+      code: err?.code,
+      errno: err?.errno,
+      sqlState: err?.sqlState,
+    })
     res.status(500).json(error(err.message))
   }
 }
@@ -72,3 +79,5 @@ export async function getDishDetail(req: Request, res: Response) {
     res.status(500).json(error(err.message))
   }
 }
+
+

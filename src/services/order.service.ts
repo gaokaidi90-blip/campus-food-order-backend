@@ -7,7 +7,6 @@ import * as addressModel from '../models/address.model.js'
 import * as canteenModel from '../models/canteen.model.js'
 import * as cartModel from '../models/cart.model.js'
 
-const pool = getPool()
 
 /**
  * 创建订单（事务）
@@ -34,7 +33,7 @@ export async function createOrder(
     remark?: string
   }
 ): Promise<orderModel.OrderWithDetails> {
-  const connection = await pool.getConnection()
+  const connection = await getPool().getConnection()
 
   try {
     await connection.beginTransaction()
@@ -160,7 +159,7 @@ export async function cancelOrder(
   orderId: string,
   reason: string
 ): Promise<orderModel.OrderWithDetails> {
-  const connection = await pool.getConnection()
+  const connection = await getPool().getConnection()
 
   try {
     await connection.beginTransaction()
@@ -202,3 +201,4 @@ export async function cancelOrder(
     connection.release()
   }
 }
+

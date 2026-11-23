@@ -8,6 +8,11 @@
 	],
 	// Set this to today's date
 	"compatibility_date": "2026-11-10",
+	"vars": {
+		"OSS_BUCKET": "campus-food-order-images",
+		"OSS_REGION": "cn-hangzhou",
+		"OSS_STS_ROLE_ARN": "acs:ram::1488038816515091:role/oss-upload-role"
+	},
 	"hyperdrive": [
 		{
 			"binding": "HYPERDRIVE",

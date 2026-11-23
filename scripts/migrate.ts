@@ -1,8 +1,9 @@
-import { pool } from '../src/config/database.js'
+import { getPool } from '../src/config/database.js'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
+const pool = getPool()
 /**
  * 数据库迁移脚本
  *

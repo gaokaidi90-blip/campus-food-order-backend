@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 分类实体类型
@@ -22,7 +21,7 @@ export interface Category {
  * @returns 分类列表（按排序权重和创建时间排序）
  */
 export async function findByCanteenId(canteenId: string): Promise<Category[]> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, canteen_id as canteenId, name, sort, created_at as createdAt, updated_at as updatedAt
      FROM categories WHERE canteen_id = ? ORDER BY sort ASC, created_at ASC`,
     [canteenId]
@@ -37,7 +36,7 @@ export async function findByCanteenId(canteenId: string): Promise<Category[]> {
  * @returns 分类信息
  */
 export async function findById(categoryId: string): Promise<Category | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, canteen_id as canteenId, name, sort, created_at as createdAt, updated_at as updatedAt
      FROM categories WHERE id = ?`,
     [categoryId]
@@ -73,13 +72,13 @@ export async function findAll(params: {
     queryParams.push(`%${params.keyword}%`)
   }
 
-  const [countRows] = await pool.query<RowDataPacket[]>(
+  const [countRows] = await getPool().query<RowDataPacket[]>(
     `SELECT COUNT(*) as total FROM categories WHERE ${whereClause}`,
     queryParams
   )
   const total = countRows[0].total
 
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT id, canteen_id as canteenId, name, sort, created_at as createdAt, updated_at as updatedAt
      FROM categories WHERE ${whereClause}
      ORDER BY sort ASC, created_at ASC
@@ -97,7 +96,7 @@ export async function findAll(params: {
  * @returns 新分类 ID
  */
 export async function create(data: Omit<Category, 'createdAt' | 'updatedAt'>): Promise<string> {
-  await pool.query(
+  await getPool().query(
     'INSERT INTO categories (id, canteen_id, name, sort) VALUES (?, ?, ?, ?)',
     [data.id, data.canteenId, data.name, data.sort]
   )
@@ -127,7 +126,7 @@ export async function update(categoryId: string, data: Partial<{ name: string; s
   if (fields.length === 0) return
 
   values.push(categoryId)
-  await pool.query(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`, values)
+  await getPool().query(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`, values)
 }
 
 /**
@@ -138,5 +137,6 @@ export async function update(categoryId: string, data: Partial<{ name: string; s
  * @param categoryId - 分类 ID
  */
 export async function remove(categoryId: string): Promise<void> {
-  await pool.query('DELETE FROM categories WHERE id = ?', [categoryId])
+  await getPool().query('DELETE FROM categories WHERE id = ?', [categoryId])
 }
+

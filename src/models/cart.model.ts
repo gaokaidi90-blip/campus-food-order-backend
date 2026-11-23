@@ -1,7 +1,6 @@
 import { getPool } from '../config/database'
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise'
 
-const pool = getPool()
 
 /**
  * 购物车项实体类型
@@ -38,7 +37,7 @@ export interface CartItemWithDish extends CartItem {
  * @returns 购物车列表（含菜品详情）
  */
 export async function findByUserId(userId: string): Promise<CartItemWithDish[]> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await getPool().query<RowDataPacket[]>(
     `SELECT
       c.id, c.user_id as userId, c.dish_id as dishId, c.canteen_id as canteenId,
       c.quantity, c.created_at as createdAt, c.updated_at as updatedAt,
@@ -78,7 +77,7 @@ export async function findByUserId(userId: string): Promise<CartItemWithDish[]> 
  * @returns 购物车项 ID
  */
 export async function addToCart(data: Omit<CartItem, 'createdAt' | 'updatedAt'>): Promise<string> {
-  await pool.query(
+  await getPool().query(
     `INSERT INTO cart_items (id, user_id, dish_id, canteen_id, quantity)
      VALUES (?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)`,
@@ -95,7 +94,7 @@ export async function addToCart(data: Omit<CartItem, 'createdAt' | 'updatedAt'>)
  * @param quantity - 新数量
  */
 export async function updateQuantity(cartItemId: string, userId: string, quantity: number): Promise<void> {
-  await pool.query(
+  await getPool().query(
     'UPDATE cart_items SET quantity = ? WHERE id = ? AND user_id = ?',
     [quantity, cartItemId, userId]
   )
@@ -108,7 +107,7 @@ export async function updateQuantity(cartItemId: string, userId: string, quantit
  * @param userId - 用户 ID（用于验证归属权）
  */
 export async function remove(cartItemId: string, userId: string): Promise<void> {
-  await pool.query('DELETE FROM cart_items WHERE id = ? AND user_id = ?', [cartItemId, userId])
+  await getPool().query('DELETE FROM cart_items WHERE id = ? AND user_id = ?', [cartItemId, userId])
 }
 
 /**
@@ -117,7 +116,7 @@ export async function remove(cartItemId: string, userId: string): Promise<void> 
  * @param userId - 用户 ID
  */
 export async function clearByUserId(userId: string): Promise<void> {
-  await pool.query('DELETE FROM cart_items WHERE user_id = ?', [userId])
+  await getPool().query('DELETE FROM cart_items WHERE user_id = ?', [userId])
 }
 
 /**
@@ -136,3 +135,4 @@ export async function clearByUserAndCanteen(
 ): Promise<void> {
   await connection.query('DELETE FROM cart_items WHERE user_id = ? AND canteen_id = ?', [userId, canteenId])
 }
+
