@@ -43,15 +43,20 @@ export async function recommendDishes(req: Request, res: Response) {
     }
 
     // 2. 关键词匹配（菜名或描述包含关键词）
-    if (criteria.keywords && criteria.keywords.length > 0) {
+    // 过滤掉无意义的通用词，只保留有实际意义的关键词
+    const meaningfulKeywords = criteria.keywords?.filter(
+      (keyword) => !['菜', '的', '吃', '要', '推荐', '找', '有'].includes(keyword) && keyword.length >= 2
+    ) || []
+
+    if (meaningfulKeywords.length > 0) {
       const beforeCount = filteredDishes.length
       filteredDishes = filteredDishes.filter((dish) => {
         const dishText = `${dish.name} ${dish.description || ''} ${dish.specifications || ''}`.toLowerCase()
-        return criteria.keywords!.some((keyword) => dishText.includes(keyword.toLowerCase()))
+        return meaningfulKeywords.some((keyword) => dishText.includes(keyword.toLowerCase()))
       })
-      console.log(`After keyword filter (${criteria.keywords.join(', ')}): ${filteredDishes.length} dishes (filtered from ${beforeCount})`)
+      console.log(`After keyword filter (${meaningfulKeywords.join(', ')}): ${filteredDishes.length} dishes (filtered from ${beforeCount})`)
     } else {
-      console.log('No keywords specified, keeping all dishes')
+      console.log('No meaningful keywords specified, keeping all dishes')
     }
 
     // 3. 辣度过滤
@@ -79,8 +84,8 @@ export async function recommendDishes(req: Request, res: Response) {
       console.log(`After taste filter (${criteria.taste.join(', ')}): ${filteredDishes.length} dishes`)
     }
 
-    // 5. 限制返回数量（最多 20 个）
-    const resultDishes = filteredDishes.slice(0, 20)
+    // 5. 限制返回数量（最多 50 个）
+    const resultDishes = filteredDishes.slice(0, 50)
 
     // 返回推荐结果和分析条件
     return res.json(
