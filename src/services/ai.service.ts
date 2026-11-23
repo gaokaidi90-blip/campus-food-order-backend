@@ -152,40 +152,20 @@ export interface ParsedCriteria {
 
 /**
  * 解析用户查询
- * 优先使用 Claude API，失败时降级到规则解析
+ * 优先使用 AI API，失败时降级到规则解析
  */
 export async function parseUserQuery(query: string): Promise<ParsedCriteria> {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
 
   // 如果没有配置 API Key，直接使用规则解析
   if (!apiKey) {
-    console.log('ANTHROPIC_API_KEY not configured, using rule-based parsing')
+    console.log('API Key not configured, using rule-based parsing')
     return parseWithRules(query)
   }
 
-  // 尝试使用 Claude API
+  // 尝试使用 AI API
   try {
-    const result = await parseWithClaude(query, apiKey, apiBaseUrl)
-    console.log('Successfully parsed with Claude API:', result)
-    return result
-  } catch (error) {
-    console.warn('Claude API failed, falling back to rule-based parsing:', error)
-    return parseWithRules(query)
-  }
-}
-
-/**
- * 使用 Claude API 解析查询
- */
-async function parseWithClaude(query: string, apiKey: string, apiBaseUrl: string): Promise<ParsedCriteria> {
-  const requestBody = JSON.stringify({
-    model: 'claude-3-5-sonnet-20241022',
-    max_tokens: 300,
-    messages: [
-      {
-        role: 'user',
-        content: `你是一个菜品推荐助手。请解析用户的点餐需求，提取关键信息。
+    const prompt = `你是一个菜品推荐助手。请解析用户的点餐需求，提取关键信息。
 
 用户需求："${query}"
 
@@ -226,90 +206,31 @@ async function parseWithClaude(query: string, apiKey: string, apiBaseUrl: string
 输出：{"keywords":["面"],"spicy":"any","taste":["清淡"]}
 
 现在请解析用户需求。`
-      }
-    ]
-  })
 
-  return new Promise((resolve, reject) => {
-    // 设置 5 秒超时
-    const timeout = setTimeout(() => {
-      reject(new Error('Claude API timeout'))
-    }, 5000)
+    const content = await callAI(prompt, 300)
 
-    // 解析 API URL
-    const url = new URL(apiBaseUrl)
-
-    const options = {
-      hostname: url.hostname,
-      port: url.port || 443,
-      path: '/v1/messages',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(requestBody),
-        'anthropic-version': '2023-06-01',
-        'x-api-key': apiKey
-      }
+    // 解析 JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('No JSON found in AI response')
     }
 
-    const req = https.request(options, (res) => {
-      let data = ''
+    const parsed = JSON.parse(jsonMatch[0])
 
-      res.on('data', (chunk) => {
-        data += chunk
-      })
+    // 标准化结果
+    const result: ParsedCriteria = {
+      maxPrice: parsed.maxPrice || undefined,
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+      spicy: parsed.spicy || 'any',
+      taste: Array.isArray(parsed.taste) ? parsed.taste : []
+    }
 
-      res.on('end', () => {
-        clearTimeout(timeout)
-
-        try {
-          const response = JSON.parse(data)
-
-          // 检查错误响应
-          if (response.error) {
-            reject(new Error(`Claude API error: ${response.error.message}`))
-            return
-          }
-
-          // 提取文本内容
-          const content = response.content?.[0]?.text
-          if (!content) {
-            reject(new Error('No content in Claude response'))
-            return
-          }
-
-          // 解析 JSON（移除可能的 markdown 代码块标记）
-          const jsonMatch = content.match(/\{[\s\S]*\}/)
-          if (!jsonMatch) {
-            reject(new Error('No JSON found in Claude response'))
-            return
-          }
-
-          const parsed = JSON.parse(jsonMatch[0])
-
-          // 标准化结果
-          const result: ParsedCriteria = {
-            maxPrice: parsed.maxPrice || undefined,
-            keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
-            spicy: parsed.spicy || 'any',
-            taste: Array.isArray(parsed.taste) ? parsed.taste : []
-          }
-
-          resolve(result)
-        } catch (error) {
-          reject(new Error(`Failed to parse Claude response: ${error}`))
-        }
-      })
-    })
-
-    req.on('error', (error) => {
-      clearTimeout(timeout)
-      reject(error)
-    })
-
-    req.write(requestBody)
-    req.end()
-  })
+    console.log('Successfully parsed with AI:', result)
+    return result
+  } catch (error) {
+    console.warn('AI parsing failed, falling back to rule-based parsing:', error)
+    return parseWithRules(query)
+  }
 }
 
 /**
@@ -434,12 +355,61 @@ export async function smartRecommend(
   limit: number = 20
 ): Promise<any[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
 
   // 如果没有配置 API Key，或候选菜品过少，直接返回
   if (!apiKey || dishes.length <= limit) {
     return dishes.slice(0, limit)
   }
+
+  // 如果候选菜品过多，限制发送给 AI 的数量（避免 token 超限）
+  const candidateDishes = dishes.slice(0, 100)
+
+  // 构建菜品列表文本
+  const dishesText = candidateDishes
+    .map((dish, index) => {
+      return `${index + 1}. ${dish.name} - ¥${dish.price}${dish.description ? ` (${dish.description})` : ''}`
+    })
+    .join('\n')
+
+  const prompt = `你是一个菜品推荐助手。用户说："${query}"
+
+以下是候选菜品列表：
+${dishesText}
+
+请根据用户需求，从候选列表中挑选最合适的菜品（最多 ${limit} 个），按推荐度从高到低排序。
+
+注意：
+- "女生喜欢"：推荐清淡、健康、小份的菜品
+- "便宜又好吃"：推荐性价比高、评价好的菜品
+- "适合减肥"：推荐低卡、蔬菜类、清淡的菜品
+- 只返回菜品编号的 JSON 数组，格式：[1, 3, 5]，不要其他内容`
+
+  try {
+    const content = await callAI(prompt, 500)
+
+    // 提取 JSON 数组
+    const jsonMatch = content.match(/\[[\s\S]*?\]/)
+    if (!jsonMatch) {
+      throw new Error('No array found in AI response')
+    }
+
+    const recommendedIndices = JSON.parse(jsonMatch[0]) as number[]
+
+    // 根据推荐的索引返回菜品
+    const result: any[] = []
+    for (const index of recommendedIndices) {
+      if (index >= 1 && index <= candidateDishes.length) {
+        result.push(candidateDishes[index - 1])
+      }
+    }
+
+    console.log(`AI smart recommend: ${result.length} dishes from ${candidateDishes.length} candidates`)
+    return result.length > 0 ? result : candidateDishes.slice(0, limit)
+  } catch (error) {
+    console.warn('AI smart recommend failed, using original order:', error)
+    return candidateDishes.slice(0, limit)
+  }
+}
 
   // 如果候选菜品过多，限制发送给 AI 的数量（避免 token 超限）
   const candidateDishes = dishes.slice(0, 100)
@@ -560,12 +530,71 @@ export async function personalizedRecommend(
   limit: number = 10
 ): Promise<any[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  const apiBaseUrl = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com'
 
   // 如果没有 API Key 或订单历史为空，返回默认推荐
   if (!apiKey || userOrders.length === 0) {
     return allDishes.slice(0, limit)
   }
+
+  // 提取历史订单中的菜品
+  const orderedDishes: { [key: string]: number } = {}
+  for (const order of userOrders.slice(0, 20)) {
+    // 只看最近 20 个订单
+    for (const item of order.items || []) {
+      orderedDishes[item.dishName] = (orderedDishes[item.dishName] || 0) + 1
+    }
+  }
+
+  // 构建历史订单文本
+  const historyText = Object.entries(orderedDishes)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([name, count]) => `${name}(点过${count}次)`)
+    .join('、')
+
+  // 构建候选菜品列表
+  const candidateDishes = allDishes.slice(0, 50)
+  const dishesText = candidateDishes
+    .map((dish, index) => `${index + 1}. ${dish.name} - ¥${dish.price}`)
+    .join('\n')
+
+  const prompt = `你是一个菜品推荐助手。根据用户的历史订单，推荐他可能喜欢的菜品。
+
+用户历史偏好：${historyText}
+
+候选菜品列表：
+${dishesText}
+
+请分析用户口味偏好（如：喜欢肉类/素菜、辣/不辣、价格区间等），然后从候选列表中挑选 ${limit} 个最适合的菜品，按推荐度排序。
+
+只返回菜品编号的 JSON 数组，格式：[1, 3, 5]，不要其他内容`
+
+  try {
+    const content = await callAI(prompt, 500)
+
+    // 提取 JSON 数组
+    const jsonMatch = content.match(/\[[\s\S]*?\]/)
+    if (!jsonMatch) {
+      throw new Error('No array found in AI response')
+    }
+
+    const recommendedIndices = JSON.parse(jsonMatch[0]) as number[]
+
+    // 根据推荐的索引返回菜品
+    const result: any[] = []
+    for (const index of recommendedIndices) {
+      if (index >= 1 && index <= candidateDishes.length) {
+        result.push(candidateDishes[index - 1])
+      }
+    }
+
+    console.log(`Personalized recommend: ${result.length} dishes based on order history`)
+    return result.length > 0 ? result : candidateDishes.slice(0, limit)
+  } catch (error) {
+    console.warn('Personalized recommend failed:', error)
+    return candidateDishes.slice(0, limit)
+  }
+}
 
   // 提取历史订单中的菜品
   const orderedDishes: { [key: string]: number } = {}
