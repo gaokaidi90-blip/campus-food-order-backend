@@ -19,6 +19,18 @@ export default {
     const ossResponse = await handleOssRequest(request, env);
     if (ossResponse) return ossResponse;
 
+    // 健康检查端点无需数据库连接，直接返回
+    const url = new URL(request.url);
+    if (url.pathname === '/health') {
+      return new Response(
+        JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     return withHyperdrivePool(env.HYPERDRIVE, async () => {
       const app = createApp();
       const server = createServer(app);
