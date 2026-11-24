@@ -3,6 +3,44 @@ import https from 'https'
 // 判断使用哪个 AI 服务
 const AI_PROVIDER = process.env.AI_PROVIDER || 'aliyun' // 'anthropic' | 'aliyun'
 
+// 简单的内存缓存（生产环境建议用 Redis）
+interface CacheEntry {
+  data: any
+  timestamp: number
+}
+
+const cache = new Map<string, CacheEntry>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 分钟缓存
+
+/**
+ * 获取缓存
+ */
+function getCache(key: string): any | null {
+  const entry = cache.get(key)
+  if (!entry) return null
+
+  // 检查是否过期
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key)
+    return null
+  }
+
+  return entry.data
+}
+
+/**
+ * 设置缓存
+ */
+function setCache(key: string, data: any): void {
+  cache.set(key, { data, timestamp: Date.now() })
+
+  // 限制缓存大小，防止内存泄漏
+  if (cache.size > 100) {
+    const firstKey = cache.keys().next().value
+    cache.delete(firstKey)
+  }
+}
+
 /**
  * 通用 AI 请求函数
  */
@@ -155,6 +193,14 @@ export interface ParsedCriteria {
  * 优先使用 AI API，失败时降级到规则解析
  */
 export async function parseUserQuery(query: string): Promise<ParsedCriteria> {
+  // 检查缓存
+  const cacheKey = `parse:${query}`
+  const cached = getCache(cacheKey)
+  if (cached) {
+    console.log('Using cached parse result for:', query)
+    return cached
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
 
   // 如果没有配置 API Key，直接使用规则解析
@@ -225,11 +271,18 @@ export async function parseUserQuery(query: string): Promise<ParsedCriteria> {
       taste: Array.isArray(parsed.taste) ? parsed.taste : []
     }
 
+    // 缓存成功的结果
+    setCache(cacheKey, result)
+
     console.log('Successfully parsed with AI:', result)
     return result
   } catch (error) {
     console.warn('AI parsing failed, falling back to rule-based parsing:', error)
-    return parseWithRules(query)
+
+    // 降级到规则解析，并缓存结果
+    const result = parseWithRules(query)
+    setCache(cacheKey, result)
+    return result
   }
 }
 
@@ -354,11 +407,22 @@ export async function smartRecommend(
   dishes: any[],
   limit: number = 20
 ): Promise<any[]> {
+  // 检查缓存（使用菜品 ID 列表生成稳定的缓存键）
+  const dishIds = dishes.map(d => d.id).sort().join(',')
+  const cacheKey = `recommend:${query}:${dishIds.substring(0, 100)}:${limit}`
+  const cached = getCache(cacheKey)
+  if (cached) {
+    console.log('Using cached recommendation for:', query)
+    return cached
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
 
   // 如果没有配置 API Key，或候选菜品过少，直接返回
   if (!apiKey || dishes.length <= limit) {
-    return dishes.slice(0, limit)
+    const result = dishes.slice(0, limit)
+    setCache(cacheKey, result)
+    return result
   }
 
   // 如果候选菜品过多，限制发送给 AI 的数量（避免 token 超限）
@@ -403,11 +467,20 @@ ${dishesText}
       }
     }
 
-    console.log(`AI smart recommend: ${result.length} dishes from ${candidateDishes.length} candidates`)
-    return result.length > 0 ? result : candidateDishes.slice(0, limit)
+    const finalResult = result.length > 0 ? result : candidateDishes.slice(0, limit)
+
+    // 缓存成功的结果
+    setCache(cacheKey, finalResult)
+
+    console.log(`AI smart recommend: ${finalResult.length} dishes from ${candidateDishes.length} candidates`)
+    return finalResult
   } catch (error) {
     console.warn('AI smart recommend failed, using original order:', error)
-    return candidateDishes.slice(0, limit)
+
+    // 降级方案也缓存
+    const fallbackResult = candidateDishes.slice(0, limit)
+    setCache(cacheKey, fallbackResult)
+    return fallbackResult
   }
 }
 
