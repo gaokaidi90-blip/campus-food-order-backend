@@ -21,6 +21,7 @@ function createHyperdrivePool(hyperdrive: any): Pool {
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
+    timezone: '+08:00', // 设置为北京时间
   })
 }
 
@@ -65,6 +66,7 @@ export function getPool(): Pool {
       queueLimit: 0,
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,
+      timezone: '+08:00', // 设置为北京时间
     })
   }
   return localPool
